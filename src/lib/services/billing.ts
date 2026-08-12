@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { activityLogs, billEntries, items } from "@/db/schema";
 import { ACTION, ENTITY_TYPE } from "@/db/schema";
 import type {
+  ActivityEntry,
   AddItemResult,
   BillLine,
   CatalogItem,
@@ -105,6 +106,46 @@ export async function getFrequentItems(userId: string, limit = 6): Promise<Catal
 
 function gteLast30Days() {
   return sql`${billEntries.consumedAt} >= NOW() - INTERVAL '30 days'`;
+}
+
+/**
+ * A user's recent activity feed: one entry per item-per-day, newest tap first.
+ * Because taps are aggregated per (user, item, day), each entry may stand for
+ * several taps of the same item on the same day.
+ */
+export async function getActivityFeed(
+  userId: string,
+  limit = 30,
+): Promise<ActivityEntry[]> {
+  const rows = await db
+    .select({
+      id: billEntries.id,
+      itemId: billEntries.itemId,
+      name: items.name,
+      icon: items.icon,
+      quantity: billEntries.quantity,
+      unitPrice: billEntries.unitPrice,
+      subtotal: billEntries.subtotal,
+      consumedAt: billEntries.consumedAt,
+      updatedAt: billEntries.updatedAt,
+    })
+    .from(billEntries)
+    .innerJoin(items, eq(billEntries.itemId, items.id))
+    .where(eq(billEntries.userId, userId))
+    .orderBy(desc(billEntries.updatedAt))
+    .limit(limit);
+
+  return rows.map((r) => ({
+    id: r.id,
+    itemId: r.itemId,
+    name: r.name,
+    icon: r.icon,
+    quantity: r.quantity,
+    unitPrice: num(r.unitPrice),
+    subtotal: num(r.subtotal),
+    consumedAt: r.consumedAt.toISOString(),
+    updatedAt: r.updatedAt.toISOString(),
+  }));
 }
 
 /* -------------------------------- Mutations ------------------------------- */

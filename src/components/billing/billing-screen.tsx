@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { Plus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useBillStore, useBillTotals } from "@/stores/bill-store";
+import { DEFAULT_DAILY_TARGET } from "@/lib/constants";
+import { useSpendMilestone } from "@/hooks/use-spend-milestone";
 import type { BillLine, CatalogItem } from "@/types/bill";
 
 import { AddItemSheet } from "./add-item-sheet";
@@ -14,30 +15,28 @@ import { AnimatedTotal } from "./animated-total";
 import { BillSheet } from "./bill-sheet";
 import { BillSummary } from "./bill-summary";
 import { ItemGrid } from "./item-grid";
-import { ItemRow } from "./item-row";
+import { RecentTaps } from "./recent-taps";
 
 export function BillingScreen({
-  userName,
   items,
   todayBill,
   recent,
-  frequent,
 }: {
-  userName: string;
   items: CatalogItem[];
   todayBill: BillLine[];
   recent: CatalogItem[];
-  frequent: CatalogItem[];
 }) {
   const [catalog, setCatalog] = useState<CatalogItem[]>(items);
   const [recentItems, setRecentItems] = useState<CatalogItem[]>(recent);
-  const [frequentItems] = useState<CatalogItem[]>(frequent);
 
   const [billOpen, setBillOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
 
   const hydrate = useBillStore((s) => s.hydrate);
   const { count, total } = useBillTotals();
+
+  // Toast when today's bill crosses each 100৳ milestone (100/200/300…).
+  useSpendMilestone(total);
 
   // Hydrate the optimistic store with today's authoritative bill (once).
   useEffect(() => {
@@ -54,49 +53,52 @@ export function BillingScreen({
     bumpRecent(item);
   }
 
-  const firstName = userName.split(" ")[0] || userName;
+  const progressPct = Math.min(100, Math.round((total / DEFAULT_DAILY_TARGET) * 100));
 
   return (
     <div className="mx-auto flex min-h-[100dvh] w-full max-w-md flex-col">
-      {/* Greeting + today's bill */}
-      <header className="space-y-1 px-4 pt-6 pb-4">
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-muted-foreground">Hey {firstName} 👋</p>
-          <Link
-            href="/profile"
-            aria-label="Profile"
-            className="flex size-9 items-center justify-center rounded-full bg-muted text-sm font-semibold text-foreground transition hover:bg-muted/70"
-          >
-            {firstName.charAt(0).toUpperCase()}
-          </Link>
-        </div>
-        <p className="text-xs uppercase tracking-wide text-muted-foreground/80">
-          Today&apos;s Bill
-        </p>
-        <div className="flex items-end justify-between">
+      <main className="flex-1 space-y-7 px-4 pb-44 pt-6">
+        {/* Today's bill card */}
+        <section
+          aria-label="Today's bill"
+          className="rounded-3xl bg-card p-5 shadow-sm ring-1 ring-foreground/5"
+        >
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Today&apos;s Bill
+            </p>
+            <span className="rounded-full bg-accent px-2.5 py-1 text-xs font-medium text-accent-foreground">
+              {count} {count === 1 ? "item" : "items"}
+            </span>
+          </div>
           <AnimatedTotal
             value={total}
-            className="text-4xl font-bold tracking-tight text-foreground"
+            className="mt-1 block text-4xl font-bold tracking-tight text-foreground"
           />
-          <span className="pb-1 text-sm text-muted-foreground">
-            {count} {count === 1 ? "item" : "items"}
-          </span>
-        </div>
-      </header>
+          {/* Progress toward the daily spending target */}
+          <div
+            className="mt-4 h-2.5 w-full overflow-hidden rounded-full bg-accent"
+            role="progressbar"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={progressPct}
+            aria-label={`Spent ${progressPct}% of daily target`}
+          >
+            <div
+              className="h-full rounded-full bg-primary transition-all duration-300"
+              style={{ width: `${progressPct}%` }}
+            />
+          </div>
+        </section>
 
-      <main className="flex-1 space-y-7 px-4 pb-6">
+        {/* Recent taps */}
         {recentItems.length > 0 && (
-          <Section title="Recently Used">
-            <ItemRow items={recentItems} onItemTap={bumpRecent} />
+          <Section title="Recent Taps">
+            <RecentTaps items={recentItems} onItemTap={bumpRecent} />
           </Section>
         )}
 
-        {frequentItems.length > 0 && (
-          <Section title="Your Go-To's">
-            <ItemRow items={frequentItems} onItemTap={bumpRecent} />
-          </Section>
-        )}
-
+        {/* All items (catalog) */}
         <Section
           title="All Items"
           action={
@@ -130,7 +132,7 @@ function Section({
   return (
     <section className="space-y-3">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-foreground">{title}</h2>
+        <h2 className="text-base font-semibold text-foreground">{title}</h2>
         {action}
       </div>
       {children}
@@ -143,10 +145,10 @@ export function BillingScreenSkeleton() {
   return (
     <div className="mx-auto flex min-h-[100dvh] w-full max-w-md flex-col px-4 pt-6">
       <Skeleton className="h-4 w-24" />
-      <Skeleton className="mt-3 h-10 w-40" />
+      <Skeleton className="mt-4 h-28 w-full rounded-3xl" />
       <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3">
         {Array.from({ length: 6 }).map((_, i) => (
-          <Skeleton key={i} className="aspect-square rounded-2xl" />
+          <Skeleton key={i} className="aspect-square rounded-3xl" />
         ))}
       </div>
     </div>

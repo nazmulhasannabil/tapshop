@@ -3,6 +3,12 @@
 export const APP_NAME = "TapShop";
 
 /**
+ * Default daily spending target (৳) used by the home screen's "Today's Bill"
+ * progress bar. Purely a client-side visual reference — not stored or enforced.
+ */
+export const DEFAULT_DAILY_TARGET = 500;
+
+/**
  * Format an amount as Bangladeshi Taka with the ৳ symbol.
  * Uses manual symbol prefix + locale grouping so it renders consistently
  * regardless of the host's ICU data.

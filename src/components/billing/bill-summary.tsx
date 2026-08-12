@@ -1,40 +1,46 @@
 "use client";
 
-import { ChevronUp } from "lucide-react";
+import { ArrowRight } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/constants";
 import { useBillTotals } from "@/stores/bill-store";
 import { AnimatedTotal } from "./animated-total";
 
-/** Persistent bottom "game-HUD" bill summary. Stays visible while scrolling. */
+/**
+ * Floating green bill action bar. Fixed above the bottom navigation so it stays
+ * reachable while scrolling. Tapping opens the detailed bill sheet.
+ */
 export function BillSummary({ onOpen }: { onOpen: () => void }) {
   const { count, total } = useBillTotals();
   const hasItems = count > 0;
 
   return (
-    <div className="sticky bottom-0 z-30 mt-auto">
-      <div
-        className="border-t border-border bg-background/85 px-4 backdrop-blur-md"
-        style={{ paddingBottom: "max(env(safe-area-inset-bottom), 0.75rem)" }}
-      >
+    <div className="pointer-events-none fixed inset-x-0 bottom-[calc(var(--bottom-nav-h)+env(safe-area-inset-bottom)+0.75rem)] z-30">
+      <div className="mx-auto w-full max-w-md px-4">
         <button
           type="button"
-          onClick={onOpen}
+          onClick={hasItems ? onOpen : undefined}
           disabled={!hasItems}
-          className="mx-auto flex w-full max-w-md items-center justify-between gap-3 py-3 disabled:opacity-70"
+          aria-label="View bill"
+          className={cn(
+            "pointer-events-auto flex w-full items-center justify-between gap-3 rounded-3xl bg-success px-4 py-3.5 text-success-foreground shadow-lg shadow-success/30 transition",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+            !hasItems && "opacity-60",
+          )}
         >
-          <span className="flex flex-col items-start leading-tight">
-            <span className="text-xs text-muted-foreground">
-              {hasItems ? `${count} ${count === 1 ? "item" : "items"}` : "Nothing yet"}
+          <span className="flex items-center gap-3">
+            <span className="rounded-full bg-success-foreground/20 px-2.5 py-1 text-xs font-semibold">
+              {hasItems ? `${count} ${count === 1 ? "item" : "items"}` : "No items"}
             </span>
-            <span className="flex items-center gap-1 text-sm font-medium text-primary/90">
-              View Bill
-              <ChevronUp className="size-4" />
-            </span>
+            <AnimatedTotal
+              value={total}
+              className="text-2xl font-bold tracking-tight"
+            />
           </span>
-          <AnimatedTotal
-            value={total}
-            className="text-2xl font-bold tracking-tight text-foreground"
-          />
+          <span className="flex items-center gap-1 text-sm font-semibold">
+            View Bill
+            <ArrowRight className="size-4" />
+          </span>
         </button>
       </div>
     </div>

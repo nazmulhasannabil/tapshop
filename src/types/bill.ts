@@ -20,6 +20,27 @@ export type BillLine = {
   subtotal: number;
 };
 
+/**
+ * One item-per-day entry in the activity feed (a row from `bill_entries`).
+ * Taps are aggregated per (user, item, day), so a single entry may represent
+ * several taps of the same item on the same day.
+ */
+export type ActivityEntry = {
+  id: string;
+  itemId: string;
+  name: string;
+  icon: string | null;
+  /** Cumulative taps for this item on this day. */
+  quantity: number;
+  /** Price snapshot captured on the first tap of the day. */
+  unitPrice: number;
+  subtotal: number;
+  /** ISO timestamp — first tap of the day. */
+  consumedAt: string;
+  /** ISO timestamp — most recent tap (drives feed ordering + "time ago"). */
+  updatedAt: string;
+};
+
 /** Standard JSON envelope for all /api mutations. */
 export type ApiResult<T> =
   | { ok: true; data: T }

@@ -47,21 +47,23 @@ export function BillItemCard({
       whileTap={{ scale: 0.95 }}
       transition={{ type: "spring", stiffness: 500, damping: 30 }}
       className={cn(
-        "group relative flex select-none flex-col items-center justify-center overflow-hidden rounded-2xl bg-card p-4 text-center ring-1 ring-foreground/10 outline-none transition-shadow",
-        "min-h-[118px] focus-visible:ring-2 focus-visible:ring-ring",
-        qty > 0 && "ring-primary/40 shadow-sm",
+        "group relative flex select-none flex-col items-center justify-center overflow-hidden rounded-3xl bg-card p-4 text-center ring-1 ring-foreground/10 outline-none transition-all",
+        "min-h-[132px] focus-visible:ring-2 focus-visible:ring-ring",
+        qty > 0 && "ring-2 ring-primary shadow-md",
         compact ? "w-[116px] shrink-0" : "aspect-square w-full",
       )}
     >
-      <span className="text-3xl leading-none drop-shadow-sm">{item.icon ?? "🍽️"}</span>
+      <span className={cn("leading-none drop-shadow-sm", compact ? "text-2xl" : "text-4xl")}>
+        {item.icon ?? "🍽️"}
+      </span>
       <span className="mt-2 line-clamp-2 text-sm font-medium leading-tight">{item.name}</span>
       <span className="tnum mt-0.5 text-xs text-muted-foreground">
         {formatCurrency(item.price)}
       </span>
 
       {qty > 0 && (
-        <span className="tnum absolute right-2 top-2 flex h-6 min-w-6 items-center justify-center rounded-full bg-primary px-1.5 text-xs font-semibold text-primary-foreground">
-          ×{qty}
+        <span className="tnum absolute right-2 top-2 flex h-6 min-w-6 items-center justify-center rounded-full bg-primary px-1.5 text-xs font-semibold text-primary-foreground shadow-sm">
+          {qty}
         </span>
       )}
 
@@ -73,9 +75,9 @@ export function BillItemCard({
             decreaseItem(item.id);
           }}
           aria-label={`Remove one ${item.name}`}
-          className="absolute bottom-2 right-2 flex size-6 items-center justify-center rounded-full bg-muted text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive active:scale-90"
+          className="absolute left-2 top-2 flex size-7 items-center justify-center rounded-full bg-background/95 text-foreground shadow-sm ring-1 ring-foreground/10 transition hover:bg-destructive/10 hover:text-destructive active:scale-90"
         >
-          <Minus className="size-3.5" />
+          <Minus className="size-4" />
         </button>
       )}
 

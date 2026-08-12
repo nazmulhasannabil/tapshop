@@ -1,34 +1,34 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { auth } from "@/lib/auth/auth";
 
 /**
  * Next.js 16 "proxy" (the successor to middleware).
  *
- * This is an OPTIMISTIC, cookie-based gate only — it checks for the presence
- * of the session cookie. Real authorization (role checks, ownership) always
- * happens on the server (Server Components / Route Handlers / the DAL).
+ * Session gating is AUTHORITATIVE here: it validates the request against
+ * Better Auth (`auth.api.getSession`), which checks the cookie signature and
+ * the `session` row in the DB. This keeps the proxy's notion of "logged in"
+ * identical to the Server Components / Route Handlers, so a stale/invalid
+ * session cookie can never cause a redirect loop between the two layers.
+ *
+ * Role/ownership authorization still happens downstream via `requireUser` /
+ * `requireAdmin` and the DAL.
  *
  * Runtime is nodejs (the only runtime supported for `proxy`).
  */
 
 const PUBLIC_PATHS = ["/login", "/register"];
 
-/** Better Auth's default session cookie prefix. */
-const SESSION_COOKIE_PREFIX = "better-auth.session_token";
-
-function hasSessionCookie(request: NextRequest) {
-  return request.cookies
-    .getAll()
-    .some((c) => c.name.startsWith(SESSION_COOKIE_PREFIX));
-}
-
 function isPublicPath(pathname: string) {
   return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 }
 
-export function proxy(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const hasSession = hasSessionCookie(request);
   const isPublic = isPublicPath(pathname);
+
+  // Same check the pages use, so the proxy and the server can never disagree.
+  const session = await auth.api.getSession({ headers: request.headers });
+  const hasSession = !!session;
 
   // Send logged-in users away from the auth pages.
   if (hasSession && isPublic) {
