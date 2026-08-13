@@ -25,10 +25,21 @@ export const isDev = nodeEnv === "development";
 /** Emails whose signup should be promoted to ADMIN role. */
 export const adminEmails = parseAdminEmails(process.env.ADMIN_EMAILS);
 
-/** Public app origin (used to build absolute Better Auth URLs). Optional. */
-export const betterAuthUrl =
-  process.env.BETTER_AUTH_URL ||
-  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : undefined);
+/**
+ * Public app origin (used to build absolute Better Auth URLs).
+ *
+ * In production, a stale `BETTER_AUTH_URL` pointing at localhost is silently
+ * ignored so that the `VERCEL_URL` fallback can take over.  This prevents the
+ * common "Invalid origin" 403 that happens when a dev value leaks into the
+ * Vercel environment.
+ */
+export const betterAuthUrl = isProd
+  ? (process.env.BETTER_AUTH_URL && !process.env.BETTER_AUTH_URL.includes("localhost")
+      ? process.env.BETTER_AUTH_URL
+      : process.env.VERCEL_URL
+        ? `https://${process.env.VERCEL_URL}`
+        : undefined)
+  : process.env.BETTER_AUTH_URL || undefined;
 
 export function isAdminEmail(email: string | null | undefined): boolean {
   if (!email) return false;
