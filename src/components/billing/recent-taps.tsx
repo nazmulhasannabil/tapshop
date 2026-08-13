@@ -59,7 +59,7 @@ function RecentChip({
       onKeyDown={handleKeyDown}
       whileTap={{ scale: 0.95 }}
       transition={{ type: "spring", stiffness: 500, damping: 30 }}
-      className="group flex shrink-0 items-center gap-2 rounded-full border border-border bg-accent py-2 pl-3 pr-2 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring"
+      className="group flex shrink-0 items-center gap-2 rounded-2xl border border-border bg-accent py-2 pl-3 pr-2 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring"
     >
       <span className="text-lg leading-none">{item.icon ?? "🍽️"}</span>
       <span className="flex flex-col leading-tight">

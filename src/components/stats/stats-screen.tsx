@@ -1,3 +1,5 @@
+"use client";
+
 import {
   BarChart3,
   CalendarDays,
@@ -8,15 +10,16 @@ import {
 } from "lucide-react";
 
 import { formatCurrency } from "@/lib/constants";
-import type { StatsData } from "@/lib/services/stats";
+import { useStatsData } from "@/stores/stats-store";
 import { WeeklyActivityChart } from "./weekly-activity-chart";
 
 /**
- * The mobile "Stats" dashboard. Renders spending summaries sourced from
- * `bill_entries` plus a weekly activity chart. Pure presentational — the only
- * client island is {@link WeeklyActivityChart}.
+ * The mobile "Stats" dashboard. Renders spending summaries sourced from the
+ * stats Zustand store, which derives live figures from the bill store.
  */
-export function StatsScreen({ stats }: { stats: StatsData }) {
+export function StatsScreen() {
+  const stats = useStatsData();
+
   return (
     <div className="mx-auto flex min-h-[100dvh] w-full max-w-md flex-col bg-background px-4 pb-[calc(var(--bottom-nav-h)+env(safe-area-inset-bottom)+1.5rem)]">
       {/* Intro */}

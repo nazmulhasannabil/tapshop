@@ -11,9 +11,19 @@ import {
 import { items, type Item } from "./items";
 import { billEntries, type BillEntry } from "./bill-entries";
 import { activityLogs, type ActivityLog } from "./activity-logs";
+import { savedBills, type SavedBillRow } from "./saved-bills";
 
-export { users, sessions, accounts, verifications, items, billEntries, activityLogs };
-export type { User, Session, Account, Item, BillEntry, ActivityLog };
+export {
+  users,
+  sessions,
+  accounts,
+  verifications,
+  items,
+  billEntries,
+  activityLogs,
+  savedBills,
+};
+export type { User, Session, Account, Item, BillEntry, ActivityLog, SavedBillRow };
 
 /* ---------------------------------- Enums --------------------------------- */
 
@@ -48,6 +58,7 @@ export const usersRelations = relations(users, ({ many }) => ({
   sessions: many(sessions),
   accounts: many(accounts),
   billEntries: many(billEntries),
+  savedBills: many(savedBills),
   createdItems: many(items),
   activityAsActor: many(activityLogs, { relationName: "actor" }),
   activityAsTarget: many(activityLogs, { relationName: "target" }),
@@ -69,6 +80,10 @@ export const itemsRelations = relations(items, ({ many, one }) => ({
 export const billEntriesRelations = relations(billEntries, ({ one }) => ({
   user: one(users, { fields: [billEntries.userId], references: [users.id] }),
   item: one(items, { fields: [billEntries.itemId], references: [items.id] }),
+}));
+
+export const savedBillsRelations = relations(savedBills, ({ one }) => ({
+  user: one(users, { fields: [savedBills.userId], references: [users.id] }),
 }));
 
 export const activityLogsRelations = relations(activityLogs, ({ one }) => ({

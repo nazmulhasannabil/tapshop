@@ -23,7 +23,7 @@ export function BillSummary({ onOpen }: { onOpen: () => void }) {
           disabled={!hasItems}
           aria-label="View bill"
           className={cn(
-            "pointer-events-auto flex w-full items-center justify-between gap-3 rounded-3xl bg-success px-4 py-3.5 text-success-foreground shadow-lg shadow-success/30 transition",
+            "pointer-events-auto flex w-full items-center justify-between gap-3 rounded-2xl bg-success px-4 py-3.5 text-success-foreground shadow-lg shadow-success/30 transition",
             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
             !hasItems && "opacity-60",
           )}

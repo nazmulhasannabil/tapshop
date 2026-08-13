@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { Minus, Plus, Trash2 } from "lucide-react";
 import {
   Sheet,
@@ -9,9 +10,11 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/constants";
 import { displayedQty, useBillLineList, useBillTotals } from "@/stores/bill-store";
 import { useBill } from "@/hooks/use-bill";
+import { useSavedBill } from "@/hooks/use-saved-bills";
 import { AnimatedTotal } from "./animated-total";
 import { EmptyState } from "./empty-state";
 
@@ -25,6 +28,18 @@ export function BillSheet({
   const lines = useBillLineList();
   const { count, total } = useBillTotals();
   const { addItem, decreaseItem, removeEntry } = useBill();
+  const { saveBill } = useSavedBill();
+  const [saving, setSaving] = useState(false);
+
+  const canSave = count > 0 && !saving;
+
+  async function handleSave() {
+    if (!canSave) return;
+    setSaving(true);
+    const res = await saveBill();
+    setSaving(false);
+    if (res.ok) onOpenChange(false);
+  }
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -99,12 +114,23 @@ export function BillSheet({
         </div>
 
         <SheetFooter className="border-t">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-muted-foreground">Total</span>
-            <AnimatedTotal
-              value={total}
-              className="text-2xl font-bold tracking-tight text-primary"
-            />
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-muted-foreground">Total</span>
+              <AnimatedTotal
+                value={total}
+                className="text-2xl font-bold tracking-tight text-primary"
+              />
+            </div>
+            <Button
+              type="button"
+              size="lg"
+              className="h-11 w-full text-base"
+              disabled={!canSave}
+              onClick={handleSave}
+            >
+              {saving ? "Saving…" : "Save Bill"}
+            </Button>
           </div>
         </SheetFooter>
       </SheetContent>

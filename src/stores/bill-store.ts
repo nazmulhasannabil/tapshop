@@ -67,6 +67,8 @@ type BillStoreState = {
   optimisticRemove: (itemId: string) => void;
   restore: (entry: BillEntry) => void;
   reset: () => void;
+  /** Empty the current bill but stay hydrated (state still matches server). */
+  clear: () => void;
 };
 
 /** Prune an entry that has no confirmed quantity and no in-flight taps. */
@@ -193,6 +195,10 @@ export const useBillStore = create<BillStoreState>((set) => ({
     set((state) => ({ entries: { ...state.entries, [entry.itemId]: entry } })),
 
   reset: () => set({ entries: {}, hydrated: false }),
+
+  // Used after a successful "Save Bill": the server clears today's bill, so we
+  // mirror that here. Stays `hydrated` because the empty state is authoritative.
+  clear: () => set({ entries: {} }),
 }));
 
 /* ------------------------------- Selectors -------------------------------- */

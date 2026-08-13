@@ -1,10 +1,10 @@
 import { requireUser } from "@/lib/auth/server";
 import { getStats } from "@/lib/services/stats";
-import { StatsScreen } from "@/components/stats/stats-screen";
+import { StatsProvider } from "@/components/stats/stats-provider";
 
 export default async function StatsPage() {
   const session = await requireUser();
   const stats = await getStats(session.user.id);
 
-  return <StatsScreen stats={stats} />;
+  return <StatsProvider initialStats={stats} />;
 }

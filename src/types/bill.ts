@@ -60,3 +60,47 @@ export type DecreaseItemResult = {
   quantity: number;
   deleted: boolean;
 };
+
+/* -------------------------------- Saved bills ------------------------------ */
+
+/** One line of a saved bill (frozen snapshot of a `bill_entries` line). */
+export type SavedBillItem = {
+  name: string;
+  icon: string | null;
+  unitPrice: number;
+  quantity: number;
+  subtotal: number;
+};
+
+/** A finalized/saved bill, including its full item snapshot. */
+export type SavedBill = {
+  id: string;
+  /** YYYY-MM-DD — the day this bill is for. */
+  billDate: string;
+  total: number;
+  itemCount: number;
+  items: SavedBillItem[];
+  /** ISO timestamp — when the bill was saved. */
+  createdAt: string;
+};
+
+/** Summary shape used for table rows (no item breakdown). */
+export type SavedBillSummary = {
+  id: string;
+  billDate: string;
+  total: number;
+  itemCount: number;
+  createdAt: string;
+};
+
+/** Result returned after saving a bill. */
+export type SaveBillResult = SavedBillSummary;
+
+/** A page of results from a paginated query. */
+export type Paginated<T> = {
+  items: T[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+};

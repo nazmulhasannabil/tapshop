@@ -61,7 +61,7 @@ export function BillingScreen({
         {/* Today's bill card */}
         <section
           aria-label="Today's bill"
-          className="rounded-3xl bg-card p-5 shadow-sm ring-1 ring-foreground/5"
+          className="rounded-2xl bg-card p-5 shadow-sm ring-1 ring-foreground/5"
         >
           <div className="flex items-center justify-between">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -145,10 +145,10 @@ export function BillingScreenSkeleton() {
   return (
     <div className="mx-auto flex min-h-[100dvh] w-full max-w-md flex-col px-4 pt-6">
       <Skeleton className="h-4 w-24" />
-      <Skeleton className="mt-4 h-28 w-full rounded-3xl" />
+      <Skeleton className="mt-4 h-28 w-full rounded-2xl" />
       <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3">
         {Array.from({ length: 6 }).map((_, i) => (
-          <Skeleton key={i} className="aspect-square rounded-3xl" />
+          <Skeleton key={i} className="aspect-square rounded-2xl" />
         ))}
       </div>
     </div>

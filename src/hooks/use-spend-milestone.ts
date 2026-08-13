@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import { toast } from "sonner";
 
 import { formatCurrency } from "@/lib/constants";
+import { useNotificationStore } from "@/stores/notification-store";
 
 const STEP = 100;
 
@@ -37,8 +38,18 @@ export function useSpendMilestone(total: number) {
 
     if (current > lastMilestoneRef.current) {
       for (let m = lastMilestoneRef.current + 1; m <= current; m++) {
-        toast(`🎉 You've spent over ${formatCurrency(m * STEP)}!`, {
+        const title = `🎉 You've spent over ${formatCurrency(m * STEP)}!`;
+        toast(title, {
           description: "Your today's bill is adding up.",
+        });
+        // Also surface it in the bell dropdown so it counts as a notification.
+        // Stable id keeps this idempotent across re-renders.
+        useNotificationStore.getState().push({
+          id: `spend-milestone-${m}`,
+          icon: "🎉",
+          title,
+          body: "Your today's bill is adding up.",
+          time: "just now",
         });
       }
       lastMilestoneRef.current = current;

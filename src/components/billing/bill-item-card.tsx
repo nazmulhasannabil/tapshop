@@ -47,7 +47,7 @@ export function BillItemCard({
       whileTap={{ scale: 0.95 }}
       transition={{ type: "spring", stiffness: 500, damping: 30 }}
       className={cn(
-        "group relative flex select-none flex-col items-center justify-center overflow-hidden rounded-3xl bg-card p-4 text-center ring-1 ring-foreground/10 outline-none transition-all",
+        "group relative flex select-none flex-col items-center justify-center overflow-hidden rounded-2xl bg-card p-4 text-center ring-1 ring-foreground/10 outline-none transition-all",
         "min-h-[132px] focus-visible:ring-2 focus-visible:ring-ring",
         qty > 0 && "ring-2 ring-primary shadow-md",
         compact ? "w-[116px] shrink-0" : "aspect-square w-full",

@@ -15,6 +15,7 @@ import {
   Loader2,
   LogOut,
   type LucideIcon,
+  MessageCircle,
   Moon,
   Palette,
   Pencil,
@@ -42,8 +43,12 @@ const accountRows: SettingsRow[] = [
 
 const appRows: SettingsRow[] = [
   { icon: Globe, label: "Language", value: "English", comingSoon: true },
-  { icon: HelpCircle, label: "Help & Support", comingSoon: true },
 ];
+
+// Support contact info. The wa.me link uses the international number without
+// the leading "+" (880 = Bangladesh) — the standard WhatsApp deep-link format.
+const SUPPORT_WHATSAPP_DISPLAY = "+8801881649665";
+const SUPPORT_WHATSAPP_LINK = "https://wa.me/8801881649665";
 
 export function ProfileView({
   name,
@@ -66,6 +71,7 @@ export function ProfileView({
   const [pending, setPending] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [appearanceOpen, setAppearanceOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   // True when the resolved avatar URL fails to load (e.g. no Gravatar) — fall
   // back to the user's initial.
   const [imgError, setImgError] = useState(false);
@@ -164,6 +170,16 @@ export function ProfileView({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [appearanceOpen]);
+
+  // Close the help & support sheet on Escape.
+  useEffect(() => {
+    if (!helpOpen) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setHelpOpen(false);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [helpOpen]);
 
   return (
     <div className="mx-auto flex min-h-[100dvh] w-full max-w-md flex-col">
@@ -291,6 +307,10 @@ export function ProfileView({
                   onClick={() => notifyComingSoon(row.label)}
                 />
               ))}
+              <SettingsRowButton
+                row={{ icon: HelpCircle, label: "Help & Support" }}
+                onClick={() => setHelpOpen(true)}
+              />
             </div>
           </div>
         </section>
@@ -437,6 +457,76 @@ export function ProfileView({
                   );
                 })}
               </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Help & support */}
+      <AnimatePresence>
+        {helpOpen && (
+          <motion.div
+            className="fixed inset-0 z-50 flex items-end justify-center p-4 sm:items-center"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <button
+              type="button"
+              aria-label="Close help & support"
+              tabIndex={-1}
+              onClick={() => setHelpOpen(false)}
+              className="absolute inset-0 bg-black/40"
+            />
+            <motion.div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="help-title"
+              initial={{ y: 24, opacity: 0, scale: 0.98 }}
+              animate={{ y: 0, opacity: 1, scale: 1 }}
+              exit={{ y: 24, opacity: 0, scale: 0.98 }}
+              transition={{ type: "spring", stiffness: 300, damping: 26 }}
+              className="relative w-full max-w-sm rounded-3xl bg-card p-5 shadow-xl ring-1 ring-foreground/5"
+            >
+              <div className="flex size-11 items-center justify-center rounded-full bg-primary/10 text-primary">
+                <HelpCircle className="size-5" />
+              </div>
+              <h3
+                id="help-title"
+                className="mt-3 text-lg font-bold text-foreground"
+              >
+                Help &amp; Support
+              </h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Have a question about your orders, account, or payments? Our
+                team is here to help you get the most out of TapShop.
+              </p>
+
+              {/* WhatsApp number */}
+              <div className="mt-4 flex items-center gap-3 rounded-2xl bg-muted/60 p-3">
+                <span className="flex size-9 items-center justify-center rounded-full bg-[#25D366]/15 text-[#25D366]">
+                  <MessageCircle className="size-5" />
+                </span>
+                <div className="min-w-0">
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    WhatsApp
+                  </p>
+                  <p className="font-semibold text-foreground">
+                    {SUPPORT_WHATSAPP_DISPLAY}
+                  </p>
+                </div>
+              </div>
+
+              {/* Call on WhatsApp */}
+              <a
+                href={SUPPORT_WHATSAPP_LINK}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-3 flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#25D366] px-4 font-semibold text-white transition hover:bg-[#1ebe5d] active:scale-[0.99]"
+              >
+                <MessageCircle className="size-4" />
+                Call on WhatsApp
+              </a>
             </motion.div>
           </motion.div>
         )}
