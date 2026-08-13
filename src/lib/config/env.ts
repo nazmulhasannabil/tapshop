@@ -26,7 +26,9 @@ export const isDev = nodeEnv === "development";
 export const adminEmails = parseAdminEmails(process.env.ADMIN_EMAILS);
 
 /** Public app origin (used to build absolute Better Auth URLs). Optional. */
-export const betterAuthUrl = process.env.BETTER_AUTH_URL;
+export const betterAuthUrl =
+  process.env.BETTER_AUTH_URL ||
+  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : undefined);
 
 export function isAdminEmail(email: string | null | undefined): boolean {
   if (!email) return false;
