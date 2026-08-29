@@ -1,7 +1,7 @@
 import { and, count, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { billEntries, savedBills } from "@/db/schema";
-import { BillingError, getTodayBill } from "@/lib/services/billing";
+import { billEntries, items, savedBills } from "@/db/schema";
+import { BillingError } from "@/lib/services/billing";
 import type {
   Paginated,
   SaveBillResult,
@@ -19,59 +19,72 @@ export const SAVED_BILLS_PAGE_SIZE = 10;
  * Save today's bill as an immutable `saved_bills` snapshot, THEN clear today's
  * `bill_entries` so the user can start a fresh bill.
  *
- * Checkout semantics: the lines are read first (source of truth is the
- * server-side entries, not client state) and frozen into the snapshot before
- * today's rows are deleted, so the saved bill always reflects what was tapped.
- * The snapshot insert and the clear run as separate statements (the Neon HTTP
- * driver doesn't support interactive transactions); a tap arriving in the tiny
- * window between the read and the delete would be cleared without landing in
- * the snapshot — an acceptable edge case for this app.
+ * Checkout semantics: read, snapshot insert, and clear run inside a single
+ * transaction so a concurrent tap cannot be deleted without landing in the
+ * snapshot.
  */
 export async function saveTodayBill(userId: string): Promise<SaveBillResult> {
-  const lines = await getTodayBill(userId);
-  if (lines.length === 0) {
-    throw new BillingError("EMPTY_BILL", "Your bill is empty.");
-  }
+  return db.transaction(async (tx) => {
+    const rows = await tx
+      .select({
+        name: items.name,
+        icon: items.icon,
+        unitPrice: billEntries.unitPrice,
+        quantity: billEntries.quantity,
+        subtotal: billEntries.subtotal,
+      })
+      .from(billEntries)
+      .innerJoin(items, eq(billEntries.itemId, items.id))
+      .where(
+        and(eq(billEntries.userId, userId), eq(billEntries.billDate, sql`CURRENT_DATE`)),
+      )
+      .orderBy(desc(billEntries.updatedAt));
 
-  const items: SavedBillItem[] = lines.map((l) => ({
-    name: l.name,
-    icon: l.icon,
-    unitPrice: l.unitPrice,
-    quantity: l.quantity,
-    subtotal: l.subtotal,
-  }));
+    if (rows.length === 0) {
+      throw new BillingError("EMPTY_BILL", "Your bill is empty.");
+    }
 
-  const total = items.reduce((sum, it) => sum + it.subtotal, 0);
-  const itemCount = items.reduce((sum, it) => sum + it.quantity, 0);
+    const billItems: SavedBillItem[] = rows.map((l) => ({
+      name: l.name,
+      icon: l.icon,
+      unitPrice: num(l.unitPrice),
+      quantity: l.quantity,
+      subtotal: num(l.subtotal),
+    }));
 
-  const [row] = await db
-    .insert(savedBills)
-    .values({
-      userId,
-      total: total.toFixed(2),
-      itemCount,
-      items,
-    })
-    .returning({
-      id: savedBills.id,
-      billDate: savedBills.billDate,
-      total: savedBills.total,
-      itemCount: savedBills.itemCount,
-      createdAt: savedBills.createdAt,
-    });
+    const total = billItems.reduce((sum, it) => sum + it.subtotal, 0);
+    const itemCount = billItems.reduce((sum, it) => sum + it.quantity, 0);
 
-  // Clear today's bill so the user is ready to create the next one.
-  await db
-    .delete(billEntries)
-    .where(and(eq(billEntries.userId, userId), eq(billEntries.billDate, sql`CURRENT_DATE`)));
+    const [row] = await tx
+      .insert(savedBills)
+      .values({
+        userId,
+        total: total.toFixed(2),
+        itemCount,
+        items: billItems,
+      })
+      .returning({
+        id: savedBills.id,
+        billDate: savedBills.billDate,
+        total: savedBills.total,
+        itemCount: savedBills.itemCount,
+        createdAt: savedBills.createdAt,
+      });
 
-  return {
-    id: row.id,
-    billDate: row.billDate,
-    total: num(row.total),
-    itemCount: row.itemCount,
-    createdAt: row.createdAt.toISOString(),
-  };
+    await tx
+      .delete(billEntries)
+      .where(
+        and(eq(billEntries.userId, userId), eq(billEntries.billDate, sql`CURRENT_DATE`)),
+      );
+
+    return {
+      id: row.id,
+      billDate: row.billDate,
+      total: num(row.total),
+      itemCount: row.itemCount,
+      createdAt: row.createdAt.toISOString(),
+    };
+  });
 }
 
 /**

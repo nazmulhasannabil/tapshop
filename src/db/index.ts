@@ -1,9 +1,11 @@
-import { neon } from "@neondatabase/serverless";
-import { drizzle } from "drizzle-orm/neon-http";
+import { drizzle } from "drizzle-orm/node-postgres";
+import { Pool } from "pg";
 import * as schema from "./schema";
 
 /**
- * Neon serverless HTTP driver — ideal for stateless Vercel functions.
+ * Standard PostgreSQL via `pg` — works with any cloud-managed Postgres
+ * (Supabase, Railway, Render, RDS, etc.). Use the provider's pooled
+ * connection string on Vercel to avoid exhausting connection limits.
  *
  * `casing: "snake_case"` keeps SQL columns aligned with the spec
  * (e.g. JS `unitPrice` → SQL `unit_price`) while we write clean camelCase.
@@ -14,15 +16,39 @@ import * as schema from "./schema";
  */
 type DB = ReturnType<typeof createDb>;
 
+const globalForPg = globalThis as { pgPool?: Pool };
+
+function poolSsl(connectionString: string) {
+  if (
+    connectionString.includes("sslmode=require") ||
+    connectionString.includes("ssl=true")
+  ) {
+    return { rejectUnauthorized: false } as const;
+  }
+  return undefined;
+}
+
 function createDb() {
   const url = process.env.DATABASE_URL;
   if (!url) {
     throw new Error(
-      "DATABASE_URL is not set. Copy .env.example to .env.local and fill in your Neon connection string.",
+      "DATABASE_URL is not set. Copy .env.example to .env.local and fill in your Postgres connection string.",
     );
   }
-  const sql = neon(url);
-  return drizzle({ client: sql, schema, casing: "snake_case" });
+
+  const pool =
+    globalForPg.pgPool ??
+    new Pool({
+      connectionString: url,
+      max: 1,
+      ssl: poolSsl(url),
+    });
+
+  if (process.env.NODE_ENV !== "production") {
+    globalForPg.pgPool = pool;
+  }
+
+  return drizzle({ client: pool, schema, casing: "snake_case" });
 }
 
 let _db: DB | null = null;

@@ -10,6 +10,11 @@ import { auth } from "@/lib/auth/auth";
  * identical to the Server Components / Route Handlers, so a stale/invalid
  * session cookie can never cause a redirect loop between the two layers.
  *
+ * To avoid a redundant DB round-trip downstream, the proxy forwards the
+ * validated session JSON in the `x-session-verified` request header.
+ * Server Components / Route Handlers read this header in `getSession()`
+ * instead of re-querying the database.
+ *
  * Role/ownership authorization still happens downstream via `requireUser` /
  * `requireAdmin` and the DAL.
  *
@@ -42,7 +47,16 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  return NextResponse.next();
+  // Forward the validated session to downstream Server Components / Route
+  // Handlers so they skip the redundant DB round-trip in getSession().
+  const response = NextResponse.next();
+  if (session) {
+    response.headers.set(
+      "x-session-verified",
+      Buffer.from(JSON.stringify(session), "utf-8").toString("base64"),
+    );
+  }
+  return response;
 }
 
 export const config = {

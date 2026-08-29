@@ -13,7 +13,7 @@ The core loop is optimized to feel like a casual game, not accounting software.
 
 - **Next.js 16** (App Router, Turbopack) · React 19 · TypeScript
 - **Tailwind CSS v4** + **shadcn/ui** (Base UI primitives) · **Lucide** icons · **Motion**
-- **Drizzle ORM** + **Neon** serverless Postgres
+- **Drizzle ORM** + **PostgreSQL** (cloud-managed)
 - **Better Auth** (email + password, session cookies, role handling)
 - **Zustand** for optimistic client billing state
 - **React Hook Form** + **Zod** · **Vitest** for tests
@@ -49,7 +49,7 @@ activity feed · PWA install + offline · integration & security tests.
 ### Prerequisites
 
 - Node.js **20.9+** and [pnpm](https://pnpm.io)
-- A [Neon](https://neon.tech) PostgreSQL project (free tier works)
+- A cloud-managed PostgreSQL database (Supabase, Railway, Render, etc.)
 
 ### 1. Install
 
@@ -67,7 +67,7 @@ Edit `.env.local`:
 
 | Variable | Value |
 | --- | --- |
-| `DATABASE_URL` | Your Neon pooled connection string |
+| `DATABASE_URL` | Your Postgres **pooled** connection string (use the pooler URL for Vercel/serverless) |
 | `BETTER_AUTH_SECRET` | A random 32+ char string (e.g. `openssl rand -base64 32`) |
 | `BETTER_AUTH_URL` | App origin, e.g. `http://localhost:3000` |
 | `ADMIN_EMAILS` | Comma-separated emails to auto-promote to admin, e.g. `you@example.com` |
@@ -75,7 +75,7 @@ Edit `.env.local`:
 ### 3. Create the schema + seed sample items
 
 ```bash
-pnpm db:push      # apply the schema to Neon
+pnpm db:push      # apply the schema to Postgres
 pnpm db:seed      # seed 8 sample items + demo accounts
 ```
 
@@ -135,15 +135,16 @@ fine for forms, but a queue would slow rapid taps.
 
 ---
 
-## Deploy (Vercel + Neon)
+## Deploy (Vercel + PostgreSQL)
 
 1. Push the repo to GitHub.
 2. Import it in Vercel.
 3. Add the same env vars (`DATABASE_URL`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`,
    `ADMIN_EMAILS`) in the Vercel project settings.
 4. Set `BETTER_AUTH_URL` to your production origin.
-5. Ensure the database schema exists (run `pnpm db:push` against your prod Neon
-   branch, or add `pnpm db:migrate` to the build command).
+5. Set `DATABASE_URL` to your provider's **pooled** production connection string.
+6. Ensure the database schema exists (run `pnpm db:migrate` against your prod database,
+   or add `pnpm db:migrate` to the build command).
 
 ---
 
