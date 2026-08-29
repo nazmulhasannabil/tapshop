@@ -9,12 +9,26 @@ for (const file of [".env.local", ".env"]) {
 
 import { defineConfig } from "drizzle-kit";
 
+function cleanDatabaseUrl(connectionString: string) {
+  return connectionString
+    .replace(/([?&])sslmode=[^&]*&?/g, "$1")
+    .replace(/([?&])ssl=[^&]*&?/g, "$1")
+    .replace(/\?&/, "?")
+    .replace(/[?&]$/, "");
+}
+
+const databaseUrl = cleanDatabaseUrl(process.env.DATABASE_URL!);
+const isLocal = /@(localhost|127\.0\.0\.1)(:|\/)/.test(databaseUrl);
+
 export default defineConfig({
   schema: "./src/db/schema/index.ts",
   out: "./src/db/migrations",
   dialect: "postgresql",
   casing: "snake_case",
-  dbCredentials: { url: process.env.DATABASE_URL! },
+  dbCredentials: {
+    url: databaseUrl,
+    ssl: isLocal ? false : { rejectUnauthorized: false },
+  },
   verbose: true,
   strict: true,
 });

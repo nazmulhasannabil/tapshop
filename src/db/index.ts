@@ -18,14 +18,29 @@ type DB = ReturnType<typeof createDb>;
 
 const globalForPg = globalThis as { pgPool?: Pool };
 
-function poolSsl(connectionString: string) {
-  if (
-    connectionString.includes("sslmode=require") ||
-    connectionString.includes("ssl=true")
-  ) {
-    return { rejectUnauthorized: false } as const;
-  }
-  return undefined;
+/** Cloud Postgres hosts (Supabase, etc.) need TLS with relaxed cert verification. */
+function isLocalPostgres(connectionString: string) {
+  return /@(localhost|127\.0\.0\.1)(:|\/)/.test(connectionString);
+}
+
+/**
+ * pg 8.23+ parses `sslmode=require` in the URL as verify-full, which rejects
+ * Supabase's cert chain. Strip ssl query params and set SSL on the Pool instead.
+ */
+function resolvePoolConfig(connectionString: string) {
+  const cleaned = connectionString
+    .replace(/([?&])sslmode=[^&]*&?/g, "$1")
+    .replace(/([?&])ssl=[^&]*&?/g, "$1")
+    .replace(/\?&/, "?")
+    .replace(/[?&]$/, "");
+
+  return {
+    connectionString: cleaned,
+    max: 1 as const,
+    ssl: isLocalPostgres(connectionString)
+      ? undefined
+      : ({ rejectUnauthorized: false } as const),
+  };
 }
 
 function createDb() {
@@ -37,12 +52,7 @@ function createDb() {
   }
 
   const pool =
-    globalForPg.pgPool ??
-    new Pool({
-      connectionString: url,
-      max: 1,
-      ssl: poolSsl(url),
-    });
+    globalForPg.pgPool ?? new Pool(resolvePoolConfig(url));
 
   if (process.env.NODE_ENV !== "production") {
     globalForPg.pgPool = pool;
