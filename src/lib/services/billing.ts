@@ -2,6 +2,7 @@ import { and, asc, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { activityLogs, billEntries, items } from "@/db/schema";
 import { ACTION, ENTITY_TYPE } from "@/db/schema";
+import { sqlAppToday } from "@/lib/timezone-sql";
 import type {
   ActivityEntry,
   AddItemResult,
@@ -53,7 +54,7 @@ export async function getTodayBill(userId: string): Promise<BillLine[]> {
     })
     .from(billEntries)
     .innerJoin(items, eq(billEntries.itemId, items.id))
-    .where(and(eq(billEntries.userId, userId), eq(billEntries.billDate, sql`CURRENT_DATE`)))
+    .where(and(eq(billEntries.userId, userId), eq(billEntries.billDate, sqlAppToday())))
     .orderBy(desc(billEntries.updatedAt));
 
   return rows.map((r) => ({
@@ -181,6 +182,7 @@ export async function addItemToBill(
       quantity: 1,
       unitPrice: price,
       subtotal: price,
+      billDate: sqlAppToday(),
     })
     .onConflictDoUpdate({
       target: [billEntries.userId, billEntries.itemId, billEntries.billDate],

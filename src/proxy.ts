@@ -1,5 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { auth } from "@/lib/auth/auth";
+import {
+  SESSION_SIG_HEADER,
+  SESSION_VERIFIED_HEADER,
+  signSessionPayload,
+} from "@/lib/auth/session-headers";
 
 /**
  * Next.js 16 "proxy" (the successor to middleware).
@@ -11,9 +16,10 @@ import { auth } from "@/lib/auth/auth";
  * session cookie can never cause a redirect loop between the two layers.
  *
  * To avoid a redundant DB round-trip downstream, the proxy forwards the
- * validated session JSON in the `x-session-verified` request header.
- * Server Components / Route Handlers read this header in `getSession()`
- * instead of re-querying the database.
+ * validated session JSON on the *request* (not response) as HMAC-signed
+ * headers. Server Components read them in `getSession()` instead of
+ * re-querying the database. Signing prevents API clients (proxy matcher
+ * excludes `/api`) from spoofing the header.
  *
  * Role/ownership authorization still happens downstream via `requireUser` /
  * `requireAdmin` and the DAL.
@@ -37,6 +43,12 @@ export async function proxy(request: NextRequest) {
 
   // Send logged-in users away from the auth pages.
   if (hasSession && isPublic) {
+    const invite = request.nextUrl.searchParams.get("invite");
+    if (invite) {
+      return NextResponse.redirect(
+        new URL(`/friends?invite=${encodeURIComponent(invite)}`, request.url),
+      );
+    }
     return NextResponse.redirect(new URL("/home", request.url));
   }
 
@@ -47,16 +59,27 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  // Forward the validated session to downstream Server Components / Route
-  // Handlers so they skip the redundant DB round-trip in getSession().
-  const response = NextResponse.next();
+  // Forward validated session upstream so RSC getSession() skips a DB hit.
+  // Must use request headers — response headers never reach Server Components.
+  const requestHeaders = new Headers(request.headers);
+  // Strip any client-supplied values before setting ours.
+  requestHeaders.delete(SESSION_VERIFIED_HEADER);
+  requestHeaders.delete(SESSION_SIG_HEADER);
+
   if (session) {
-    response.headers.set(
-      "x-session-verified",
-      Buffer.from(JSON.stringify(session), "utf-8").toString("base64"),
-    );
+    const secret = process.env.BETTER_AUTH_SECRET;
+    if (secret) {
+      const payload = Buffer.from(JSON.stringify(session), "utf-8").toString(
+        "base64",
+      );
+      requestHeaders.set(SESSION_VERIFIED_HEADER, payload);
+      requestHeaders.set(SESSION_SIG_HEADER, signSessionPayload(payload, secret));
+    }
   }
-  return response;
+
+  return NextResponse.next({
+    request: { headers: requestHeaders },
+  });
 }
 
 export const config = {

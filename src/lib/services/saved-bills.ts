@@ -2,6 +2,7 @@ import { and, count, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { billEntries, items, savedBills } from "@/db/schema";
 import { BillingError } from "@/lib/services/billing";
+import { sqlAppToday } from "@/lib/timezone-sql";
 import type {
   Paginated,
   SaveBillResult,
@@ -36,7 +37,7 @@ export async function saveTodayBill(userId: string): Promise<SaveBillResult> {
       .from(billEntries)
       .innerJoin(items, eq(billEntries.itemId, items.id))
       .where(
-        and(eq(billEntries.userId, userId), eq(billEntries.billDate, sql`CURRENT_DATE`)),
+        and(eq(billEntries.userId, userId), eq(billEntries.billDate, sqlAppToday())),
       )
       .orderBy(desc(billEntries.updatedAt));
 
@@ -62,6 +63,7 @@ export async function saveTodayBill(userId: string): Promise<SaveBillResult> {
         total: total.toFixed(2),
         itemCount,
         items: billItems,
+        billDate: sqlAppToday(),
       })
       .returning({
         id: savedBills.id,
@@ -74,7 +76,7 @@ export async function saveTodayBill(userId: string): Promise<SaveBillResult> {
     await tx
       .delete(billEntries)
       .where(
-        and(eq(billEntries.userId, userId), eq(billEntries.billDate, sql`CURRENT_DATE`)),
+        and(eq(billEntries.userId, userId), eq(billEntries.billDate, sqlAppToday())),
       );
 
     return {

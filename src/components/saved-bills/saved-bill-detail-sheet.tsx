@@ -8,7 +8,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { formatCurrency, formatRelativeTime } from "@/lib/constants";
+import { formatCurrency, formatRelativeTime, formatYmdDate } from "@/lib/constants";
 import type { SavedBill } from "@/types/bill";
 
 /**
@@ -84,8 +84,6 @@ function DetailBody({ bill }: { bill: SavedBill }) {
 }
 
 /** Format a YYYY-MM-DD bill date as a readable label. */
-function formatBillDate(iso: string): string {
-  const date = new Date(`${iso}T00:00:00`);
-  if (Number.isNaN(date.getTime())) return iso;
-  return date.toLocaleDateString(undefined, { dateStyle: "medium" });
+function formatBillDate(ymd: string): string {
+  return formatYmdDate(ymd);
 }

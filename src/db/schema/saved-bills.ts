@@ -8,6 +8,7 @@ import {
   jsonb,
   index,
 } from "drizzle-orm/pg-core";
+import { APP_TIMEZONE } from "@/lib/timezone";
 import { sql } from "drizzle-orm";
 import { users } from "./auth";
 import type { SavedBillItem } from "@/types/bill";
@@ -34,8 +35,10 @@ export const savedBills = pgTable(
     userId: text("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    /** The day this bill is for (server CURRENT_DATE at save time). */
-    billDate: date("bill_date", { mode: "string" }).notNull().default(sql`CURRENT_DATE`),
+    /** The day this bill is for (app timezone calendar date at save time). */
+    billDate: date("bill_date", { mode: "string" })
+      .notNull()
+      .default(sql.raw(`(timezone('${APP_TIMEZONE}', now()))::date`)),
     total: numeric("total", { precision: 12, scale: 2 }).notNull(),
     /** Sum of every line's `quantity`. */
     itemCount: integer("item_count").notNull(),

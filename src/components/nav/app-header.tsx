@@ -16,7 +16,7 @@ import {
  * in the `(user)` layout so every authenticated screen (Home, Activity, Stats,
  * Profile) shares the same header.
  *
- * The bell shows the unread count and opens a dropdown of notifications. The
+ * The bell shows an unread indicator and opens a dropdown of notifications. The
  * list lives in the notification store (`@/stores/notification-store`), which
  * is seeded with a few static entries and also receives real events (e.g.
  * spend-milestone toasts). Nothing is persisted — "Mark all read" clears the
@@ -32,7 +32,6 @@ export function AppHeader({ isAdmin }: { isAdmin?: boolean }) {
 
   const unread = notifications.filter((n) => !readIds.has(n.id));
   const unreadCount = unread.length;
-  const badgeLabel = unreadCount > 9 ? "9+" : String(unreadCount);
 
   // Close on Escape.
   useEffect(() => {
@@ -77,9 +76,10 @@ export function AppHeader({ isAdmin }: { isAdmin?: boolean }) {
           >
             <Bell className="size-5" />
             {unreadCount > 0 && (
-              <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold leading-none text-destructive-foreground ring-2 ring-background">
-                {badgeLabel}
-              </span>
+              <span
+                aria-hidden
+                className="absolute right-1.5 top-1.5 size-2 rounded-full bg-destructive ring-2 ring-background"
+              />
             )}
           </button>
 

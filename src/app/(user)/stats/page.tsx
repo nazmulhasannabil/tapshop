@@ -1,10 +1,6 @@
-import { requireUser } from "@/lib/auth/server";
-import { getStats } from "@/lib/services/stats";
-import { StatsProvider } from "@/components/stats/stats-provider";
+import { redirect } from "next/navigation";
 
-export default async function StatsPage() {
-  const session = await requireUser();
-  const stats = await getStats(session.user.id);
-
-  return <StatsProvider initialStats={stats} />;
+/** Stats UI moved onto Activity — keep old URLs working. */
+export default function StatsPage() {
+  redirect("/activity");
 }

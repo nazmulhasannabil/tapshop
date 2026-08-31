@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import {
   Bar,
   BarChart,
+  CartesianGrid,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -15,6 +16,17 @@ import { formatCurrency } from "@/lib/constants";
 import type { DayTotal } from "@/lib/services/stats";
 
 const CHART_HEIGHT = 200;
+
+/** Format YYYY-MM-DD for the chart tooltip (e.g. "Sep 1, 2026"). */
+function formatChartDate(ymd: string): string {
+  const [y, m, d] = ymd.split("-").map(Number);
+  if (!y || !m || !d) return ymd;
+  return new Date(y, m - 1, d).toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
 
 /**
  * Minimal Mon–Sun spending bar chart for the Stats screen.
@@ -38,6 +50,12 @@ export function WeeklyActivityChart({ data }: { data: DayTotal[] }) {
         margin={{ top: 12, right: 4, bottom: 0, left: 4 }}
         barCategoryGap="22%"
       >
+        <CartesianGrid
+          vertical={false}
+          stroke="var(--border)"
+          strokeDasharray="4 4"
+          strokeOpacity={0.9}
+        />
         <XAxis
           dataKey="label"
           tickLine={false}
@@ -49,6 +67,10 @@ export function WeeklyActivityChart({ data }: { data: DayTotal[] }) {
         <Tooltip
           cursor={false}
           formatter={(value) => formatCurrency(Number(value))}
+          labelFormatter={(_, payload) => {
+            const date = payload?.[0]?.payload?.date as string | undefined;
+            return date ? formatChartDate(date) : "";
+          }}
           contentStyle={{
             borderRadius: 12,
             border: "1px solid var(--border)",

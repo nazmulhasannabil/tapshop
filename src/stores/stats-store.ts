@@ -4,133 +4,137 @@ import type { StatsData } from "@/lib/services/stats";
 import { useBillStore, computeTotals } from "@/stores/bill-store";
 
 /**
- * Client stats store — derives live figures from the bill store.
+ * Client stats store.
  *
- * Server-fetched stats provide the baseline. Every time the bill store
- * changes (optimistic add / confirm / fail), we re-derive:
- *   - todaySpend   ← bill store computeTotals().total
- *   - weekSpend   ← serverWeek + todayDelta
- *   - monthSpend  ← serverMonth + todayDelta
- *   - itemsTapped ← serverItems + tapCountDelta
- *   - weekly[todayIndex] ← live today total
+ * Server stats already include saved bills + the open bill. Live overlays only
+ * replace the *open* portion with the bill-store total so optimistic taps
+ * update today/week/month without double-counting Activity snapshots:
  *
- * yesterdaySpend and mostUsed are untouched by today's taps.
+ *   displayToday = server.todaySpend - server.openTodaySpend + billTotal
+ *   displayWeek  = server.weekSpend  - server.openTodaySpend + billTotal
+ *   …
+ *
+ * When the bill store is not hydrated, server figures are shown unchanged.
  */
 
 const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
 
-/** Get 0-based index for today in the Mon–Sun week. */
-function todayWeekIndex(): number {
-  const d = new Date().getDay(); // 0=Sun … 6=Sat
-  return (d + 6) % 7; // 0=Mon … 6=Sun
-}
-
-function deriveStats(
-  serverStats: StatsData | null,
-  billTotal: number,
-  billTapCount: number,
-): StatsData {
-  // Empty fallback when the store hasn't been hydrated yet.
-  if (!serverStats) {
-    return {
-      todaySpend: 0,
-      yesterdaySpend: 0,
-      weekSpend: 0,
-      monthSpend: 0,
-      itemsTapped: 0,
-      mostUsed: null,
-      weekly: DAY_LABELS.map((label) => ({ label, value: 0 })),
-    };
-  }
-
-  const todayDelta = billTotal - serverStats.todaySpend;
-  const tapDelta = billTapCount - serverStats.itemsTapped;
-
-  const weekSpend = Math.max(0, serverStats.weekSpend + todayDelta);
-  const monthSpend = Math.max(0, serverStats.monthSpend + todayDelta);
-  const itemsTapped = Math.max(0, serverStats.itemsTapped + tapDelta);
-
-  // Update today's bar in the weekly chart
-  const dayIdx = todayWeekIndex();
-  const weekly = serverStats.weekly.map((d, i) =>
-    i === dayIdx ? { ...d, value: billTotal } : d,
-  );
-
+function emptyStats(): StatsData {
   return {
-    todaySpend: billTotal,
-    yesterdaySpend: serverStats.yesterdaySpend,
-    weekSpend,
-    monthSpend,
-    itemsTapped,
-    mostUsed: serverStats.mostUsed,
-    weekly,
-  };
-}
-
-type StatsStoreState = {
-  /** The last server-fetched baseline. Used to compute deltas. */
-  serverStats: StatsData | null;
-  /** The reactive stats that the UI reads. */
-  stats: StatsData;
-
-  hydrate: (serverStats: StatsData) => void;
-  /** Replace the server baseline (e.g. on page revisit or periodic refresh). */
-  refreshFromServer: (serverStats: StatsData) => void;
-};
-
-export const useStatsStore = create<StatsStoreState>((set, get) => ({
-  serverStats: null,
-  stats: {
     todaySpend: 0,
     yesterdaySpend: 0,
     weekSpend: 0,
     monthSpend: 0,
+    openTodaySpend: 0,
     itemsTapped: 0,
+    todayTapCount: 0,
     mostUsed: null,
-    weekly: DAY_LABELS.map((label) => ({ label, value: 0 })),
-  },
+    todayDate: "",
+    weekly: DAY_LABELS.map((label) => ({ label, date: "", value: 0 })),
+    monthly: [],
+  };
+}
+
+function deriveStats(
+  serverStats: StatsData | null,
+  billHydrated: boolean,
+  billTotal: number,
+  billTapCount: number,
+): StatsData {
+  if (!serverStats) return emptyStats();
+  if (!billHydrated) return serverStats;
+
+  // Swap the open-bill baseline for the live bill-store total.
+  const openDelta = billTotal - serverStats.openTodaySpend;
+  const tapDelta = billTapCount - serverStats.todayTapCount;
+
+  const todaySpend = Math.max(0, serverStats.todaySpend + openDelta);
+  const weekSpend = Math.max(0, serverStats.weekSpend + openDelta);
+  const monthSpend = Math.max(0, serverStats.monthSpend + openDelta);
+  const itemsTapped = Math.max(0, serverStats.itemsTapped + tapDelta);
+
+  // Key overlays to the server calendar day (same as bill_date / open bill),
+  // not the browser weekday — otherwise TZ skew duplicates spend on two bars.
+  const today = serverStats.todayDate;
+  const weekly = serverStats.weekly.map((d) =>
+    d.date === today ? { ...d, value: todaySpend } : d,
+  );
+  const monthly = serverStats.monthly.map((d) =>
+    d.date === today ? { ...d, value: todaySpend } : d,
+  );
+
+  return {
+    todaySpend,
+    yesterdaySpend: serverStats.yesterdaySpend,
+    weekSpend,
+    monthSpend,
+    openTodaySpend: billTotal,
+    itemsTapped,
+    todayTapCount: billTapCount,
+    mostUsed: serverStats.mostUsed,
+    todayDate: serverStats.todayDate,
+    weekly,
+    monthly,
+  };
+}
+
+function billSnapshot(): {
+  hydrated: boolean;
+  total: number;
+  count: number;
+} {
+  const bill = useBillStore.getState();
+  const { total, count } = computeTotals(bill.entries);
+  return { hydrated: bill.hydrated, total, count };
+}
+
+type StatsStoreState = {
+  serverStats: StatsData | null;
+  stats: StatsData;
+  hydrate: (serverStats: StatsData) => void;
+  refreshFromServer: (serverStats: StatsData) => void;
+};
+
+export const useStatsStore = create<StatsStoreState>((set) => ({
+  serverStats: null,
+  stats: emptyStats(),
 
   hydrate: (serverStats) =>
     set((state) => {
-      // Already hydrated with same data — skip to avoid re-deriving.
       if (state.serverStats) return state;
-      const { total, count } = computeTotals(useBillStore.getState().entries);
+      const { hydrated, total, count } = billSnapshot();
       return {
         serverStats,
-        stats: deriveStats(serverStats, total, count),
+        stats: deriveStats(serverStats, hydrated, total, count),
       };
     }),
 
   refreshFromServer: (serverStats) => {
-    const { total, count } = computeTotals(useBillStore.getState().entries);
-    set({ serverStats, stats: deriveStats(serverStats, total, count) });
+    const { hydrated, total, count } = billSnapshot();
+    set({
+      serverStats,
+      stats: deriveStats(serverStats, hydrated, total, count),
+    });
   },
 }));
 
-/* ---------- Cross-store subscription ---------- */
-
-/**
- * Subscribe to the bill store so stats re-derive automatically on every
- * optimistic change (add, confirm, fail, decrease, remove, clear).
- *
- * Zustand's `subscribe` listener fires on every state change, but we only
- * re-derive when the entries object reference actually changes (rapid taps
- * all produce new objects).
- */
 let prevEntriesRef: Record<string, import("@/stores/bill-store").BillEntry> | undefined;
+let prevHydrated = false;
 
 useBillStore.subscribe((billState) => {
-  if (billState.entries === prevEntriesRef) return;
+  const entriesChanged = billState.entries !== prevEntriesRef;
+  const hydratedChanged = billState.hydrated !== prevHydrated;
+  if (!entriesChanged && !hydratedChanged) return;
   prevEntriesRef = billState.entries;
+  prevHydrated = billState.hydrated;
 
   const { serverStats } = useStatsStore.getState();
   if (!serverStats) return;
   const { total, count } = computeTotals(billState.entries);
-  useStatsStore.setState({ stats: deriveStats(serverStats, total, count) });
+  useStatsStore.setState({
+    stats: deriveStats(serverStats, billState.hydrated, total, count),
+  });
 });
 
-/* ---------- Selectors ---------- */
-
-/** The full reactive StatsData object. */
 export const useStatsData = (): StatsData =>
   useStatsStore(useShallow((s) => s.stats));

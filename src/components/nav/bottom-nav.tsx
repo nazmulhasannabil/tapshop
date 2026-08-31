@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, Home, ReceiptText, User } from "lucide-react";
+import { Home, ReceiptText, User, HandCoins } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type Tab = {
@@ -15,12 +15,22 @@ type Tab = {
 
 const TABS: Tab[] = [
   { href: "/home", label: "Home", icon: Home, matches: ["/home"] },
-  { href: "/activity", label: "Activity", icon: ReceiptText, matches: ["/activity"] },
-  { href: "/stats", label: "Stats", icon: BarChart3, matches: ["/stats"] },
+  {
+    href: "/activity",
+    label: "Activity",
+    icon: ReceiptText,
+    matches: ["/activity", "/stats"],
+  },
+  {
+    href: "/debts",
+    label: "Debts",
+    icon: HandCoins,
+    matches: ["/debts"],
+  },
   { href: "/profile", label: "Profile", icon: User, matches: ["/profile"] },
 ];
 
-/** Fixed bottom navigation with four destinations. */
+/** Fixed bottom navigation with primary destinations. */
 export function BottomNav() {
   const pathname = usePathname();
 

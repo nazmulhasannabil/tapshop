@@ -1,3 +1,5 @@
+import { ymdInAppTimezone } from "@/lib/timezone";
+
 /** App-wide constants and formatting helpers. */
 
 export const APP_NAME = "TapShop";
@@ -45,7 +47,18 @@ export function formatRelativeTime(from: Date | string, now: Date = new Date()):
   return `${years}y ago`;
 }
 
-/** The `consumed_at` bucket key used to group a user's "today" bill. */
+/** Calendar `YYYY-MM-DD` for an instant in the app timezone (not UTC). */
 export function todayKey(now: Date = new Date()): string {
-  return now.toISOString().slice(0, 10); // YYYY-MM-DD
+  return ymdInAppTimezone(now);
+}
+
+/** Format a `YYYY-MM-DD` bill date without UTC parse shifting the day. */
+export function formatYmdDate(
+  ymd: string,
+  options: Intl.DateTimeFormatOptions = { dateStyle: "medium" },
+): string {
+  const [y, m, d] = ymd.split("-").map(Number);
+  if (!y || !m || !d) return ymd;
+  // Construct in local calendar space; do not parse as UTC midnight.
+  return new Date(y, m - 1, d).toLocaleDateString(undefined, options);
 }

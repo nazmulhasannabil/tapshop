@@ -18,8 +18,9 @@ describe("formatCurrency", () => {
 });
 
 describe("todayKey", () => {
-  it("returns a YYYY-MM-DD string", () => {
-    expect(todayKey(new Date("2026-08-12T10:00:00Z"))).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  it("returns a YYYY-MM-DD string in the app timezone", () => {
+    // 2026-08-12 22:00 UTC = 2026-08-13 04:00 in Asia/Dhaka
+    expect(todayKey(new Date("2026-08-12T22:00:00Z"))).toBe("2026-08-13");
   });
 });
 

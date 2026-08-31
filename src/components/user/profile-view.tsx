@@ -21,6 +21,7 @@ import {
   Pencil,
   Sun,
   User,
+  Users,
 } from "lucide-react";
 
 import { authClient } from "@/lib/auth/client";
@@ -185,8 +186,8 @@ export function ProfileView({
     <div className="mx-auto flex min-h-[100dvh] w-full max-w-md flex-col">
       <main className="flex-1 space-y-6 px-4 pt-6 pb-[calc(var(--bottom-nav-h)+env(safe-area-inset-bottom)+1.5rem)]">
         {/* Profile */}
-        <section className="flex flex-col items-center gap-1 pt-2 text-center">
-          <div className="relative size-24">
+        <section className="flex items-center gap-4 pt-2">
+          <div className="relative size-24 shrink-0">
             <div className="relative flex size-24 items-center justify-center rounded-full bg-accent">
               {displayAvatar && !imgError ? (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -228,8 +229,10 @@ export function ProfileView({
               className="hidden"
             />
           </div>
-          <h2 className="mt-2 text-xl font-bold text-foreground">{name}</h2>
-          <p className="text-sm text-muted-foreground">{email}</p>
+          <div className="min-w-0 flex flex-col gap-0.5">
+            <h2 className="truncate text-xl font-bold text-foreground">{name}</h2>
+            <p className="truncate text-sm text-muted-foreground">{email}</p>
+          </div>
         </section>
 
         {/* Total consumption */}
@@ -274,6 +277,10 @@ export function ProfileView({
           </h3>
           <div className="overflow-hidden rounded-3xl bg-card shadow-sm ring-1 ring-foreground/5">
             <div className="divide-y divide-border">
+              <SettingsRowButton
+                row={{ icon: Users, label: "Friends" }}
+                onClick={() => router.push("/friends")}
+              />
               {accountRows.map((row) => (
                 <SettingsRowButton
                   key={row.label}

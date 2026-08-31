@@ -1,174 +1,283 @@
-import { and, asc, desc, eq, sql, type SQL } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { billEntries, items } from "@/db/schema";
+import { billEntries, items, savedBills } from "@/db/schema";
+import { sqlAppTodayMinus } from "@/lib/timezone-sql";
+import { ymdInAppTimezone } from "@/lib/timezone";
 
 /**
- * Spending/analytics aggregation for the Stats screen.
+ * Spending/analytics for the Stats screen.
  *
- * All figures are derived from {@link billEntries} — one row per
- * (user, item, day). `unit_price`/`subtotal` are snapshots, so historical
- * sums stay correct even if `items.price` changes later.
+ * Spend is the sum of:
+ *   1. Open lines in {@link billEntries} (today's unsaved bill)
+ *   2. Finalized snapshots in {@link savedBills} (Activity history)
+ *
+ * Saving a bill moves rows from (1) → (2). Stats must count both, or
+ * week/month totals shrink every time the user hits Save.
+ *
+ * Hot path: three SQL round-trips (open series, saved series, most-used),
+ * with all card totals / charts derived in JS from those series. Avoids the
+ * previous ~20-query fan-out that serialized on a single pg connection.
  */
 
-/** Numeric columns come back as strings from Drizzle; coerce for the client. */
-const num = (v: string | number | null | undefined): number =>
-  Number(v ?? 0);
+const num = (v: string | number | null | undefined): number => Number(v ?? 0);
 
-/** A single weekday's spending total in the weekly chart. */
-export type DayTotal = { label: string; value: number };
-
+/** One weekday bar (`date` is YYYY-MM-DD; `label` is Mon–Sun). */
+export type DayTotal = { label: string; date: string; value: number };
+/** One calendar day in the monthly spend heatmap (`date` is YYYY-MM-DD). */
+export type MonthDayTotal = { date: string; value: number };
 export type MostUsed = { name: string; icon: string | null };
 
-/** Serializable payload handed to the `<StatsScreen />` client component. */
 export type StatsData = {
   todaySpend: number;
   yesterdaySpend: number;
   weekSpend: number;
   monthSpend: number;
+  /**
+   * Open (unsaved) bill spend for today only — baseline for live bill-store
+   * overlays. Full `todaySpend` = saved-today + this value.
+   */
+  openTodaySpend: number;
   itemsTapped: number;
+  /** Open-bill tap count today — baseline for live tap deltas. */
+  todayTapCount: number;
   mostUsed: MostUsed | null;
+  /**
+   * App-timezone calendar today (`YYYY-MM-DD`). Client live overlays key off
+   * this so they stay aligned with bill_date buckets.
+   */
+  todayDate: string;
   weekly: DayTotal[];
+  /** Per-day spend for past 11 months through next month (zero-filled). */
+  monthly: MonthDayTotal[];
 };
 
 const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
 
-/**
- * Monday 00:00 (local time) of the week containing `now`.
- * Used both to bound the SQL query and to build the 7-day chart skeleton.
- */
-function startOfWeek(now: Date = new Date()): Date {
-  const d = new Date(now);
-  d.setHours(0, 0, 0, 0);
-  const diff = (d.getDay() + 6) % 7; // days since Monday (0 = Monday)
-  d.setDate(d.getDate() - diff);
-  return d;
+type DayAgg = { spend: number; taps: number };
+
+/** Add `days` to a `YYYY-MM-DD` string in UTC calendar space (no TZ shift). */
+function addDaysYmd(ymd: string, days: number): string {
+  const [y, m, d] = ymd.split("-").map(Number);
+  const date = new Date(Date.UTC(y, m - 1, d + days));
+  const yy = date.getUTCFullYear();
+  const mm = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const dd = String(date.getUTCDate()).padStart(2, "0");
+  return `${yy}-${mm}-${dd}`;
 }
 
-/** Sum `subtotal` for a single day expressed as a SQL date expression. */
-async function sumSpendOnDay(
-  userId: string,
-  dateExpr: SQL,
-): Promise<number> {
-  const [row] = await db
-    .select({ total: sql<string>`coalesce(sum(${billEntries.subtotal}), 0)` })
-    .from(billEntries)
-    .where(
-      and(eq(billEntries.userId, userId), eq(billEntries.billDate, dateExpr)),
-    );
-  return num(row?.total);
+/** Monday YYYY-MM-DD of the current week (ISO), matching Postgres `date_trunc('week')`. */
+function startOfWeekYmd(todayYmd: string): string {
+  const [y, m, d] = todayYmd.split("-").map(Number);
+  const dow = new Date(Date.UTC(y, m - 1, d)).getUTCDay(); // 0=Sun
+  const sinceMon = (dow + 6) % 7;
+  return addDaysYmd(todayYmd, -sinceMon);
 }
 
-/** Sum `subtotal` from a SQL date expression onward (week / month ranges). */
-async function sumSpendFrom(
-  userId: string,
-  fromDateExpr: SQL,
-): Promise<number> {
-  const [row] = await db
-    .select({ total: sql<string>`coalesce(sum(${billEntries.subtotal}), 0)` })
-    .from(billEntries)
-    .where(
-      and(
-        eq(billEntries.userId, userId),
-        sql`${billEntries.billDate} >= ${fromDateExpr}`,
-      ),
-    );
-  return num(row?.total);
+/** First day of the calendar month containing `ymd`. */
+function startOfMonthYmd(ymd: string): string {
+  return `${ymd.slice(0, 7)}-01`;
 }
 
-/** Total item taps (sum of quantity) over the trailing 30 days. */
-async function getItemsTapped(userId: string): Promise<number> {
-  const [row] = await db
-    .select({ total: sql<string>`coalesce(sum(${billEntries.quantity}), 0)` })
-    .from(billEntries)
-    .where(
-      and(
-        eq(billEntries.userId, userId),
-        sql`${billEntries.consumedAt} >= NOW() - INTERVAL '30 days'`,
-      ),
-    );
-  return num(row?.total);
+/** Add calendar months to a YYYY-MM-DD (day clamped via UTC Date). */
+function addMonthsYmd(ymd: string, months: number): string {
+  const [y, m, d] = ymd.split("-").map(Number);
+  const date = new Date(Date.UTC(y, m - 1 + months, d));
+  const yy = date.getUTCFullYear();
+  const mm = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const dd = String(date.getUTCDate()).padStart(2, "0");
+  return `${yy}-${mm}-${dd}`;
 }
 
-/** The item the user has tapped most over the trailing 30 days. */
-export async function getMostUsed(userId: string): Promise<MostUsed | null> {
-  const [row] = await db
-    .select({ name: items.name, icon: items.icon })
-    .from(billEntries)
-    .innerJoin(items, eq(billEntries.itemId, items.id))
-    .where(
-      and(
-        eq(billEntries.userId, userId),
-        sql`${billEntries.consumedAt} >= NOW() - INTERVAL '30 days'`,
-      ),
-    )
-    .groupBy(items.id, items.name, items.icon)
-    .orderBy(desc(sql`sum(${billEntries.quantity})`))
-    .limit(1);
-
-  return row ? { name: row.name, icon: row.icon } : null;
+/** Past 11 months through next month (same window as the previous SQL bounds). */
+function monthRangeBounds(todayYmd: string): {
+  start: string;
+  endExclusive: string;
+  dayCount: number;
+} {
+  const monthStart = startOfMonthYmd(todayYmd);
+  const start = addMonthsYmd(monthStart, -11);
+  const endExclusive = addMonthsYmd(monthStart, 2);
+  const [ys, ms, ds] = start.split("-").map(Number);
+  const [ye, me, de] = endExclusive.split("-").map(Number);
+  const dayCount = Math.round(
+    (Date.UTC(ye, me - 1, de) - Date.UTC(ys, ms - 1, ds)) / 86_400_000,
+  );
+  return { start, endExclusive, dayCount };
 }
 
-/** Mon–Sun spending totals for the current week (zeros for days with no spend). */
-async function getWeekly(userId: string): Promise<DayTotal[]> {
-  const monday = startOfWeek();
-  const mondayStr = monday.toISOString().slice(0, 10);
-
-  // Pre-fill the 7-day skeleton so empty days still render in the chart.
-  const skeleton = DAY_LABELS.map((label, i) => {
-    const d = new Date(monday);
-    d.setDate(monday.getDate() + i);
-    return { label, key: d.toISOString().slice(0, 10), value: 0 };
+function mergeDay(
+  map: Map<string, DayAgg>,
+  billDate: string,
+  spend: number,
+  taps: number,
+) {
+  const prev = map.get(billDate) ?? { spend: 0, taps: 0 };
+  map.set(billDate, {
+    spend: prev.spend + spend,
+    taps: prev.taps + taps,
   });
+}
 
-  const rows = await db
-    .select({
-      billDate: billEntries.billDate,
-      total: sql<string>`coalesce(sum(${billEntries.subtotal}), 0)`,
-    })
-    .from(billEntries)
-    .where(
-      and(
-        eq(billEntries.userId, userId),
-        sql`${billEntries.billDate} >= ${mondayStr}`,
-      ),
-    )
-    .groupBy(billEntries.billDate)
-    .orderBy(asc(billEntries.billDate));
+function sumSpendFrom(
+  map: Map<string, DayAgg>,
+  fromInclusive: string,
+  endExclusive?: string,
+): number {
+  let total = 0;
+  for (const [date, agg] of map) {
+    if (date < fromInclusive) continue;
+    if (endExclusive && date >= endExclusive) continue;
+    total += agg.spend;
+  }
+  return total;
+}
 
-  const byKey = new Map(rows.map((r) => [r.billDate, num(r.total)]));
-  return skeleton.map((d) => ({ label: d.label, value: byKey.get(d.key) ?? 0 }));
+function sumTapsFrom(
+  map: Map<string, DayAgg>,
+  fromInclusive: string,
+  endExclusive?: string,
+): number {
+  let total = 0;
+  for (const [date, agg] of map) {
+    if (date < fromInclusive) continue;
+    if (endExclusive && date >= endExclusive) continue;
+    total += agg.taps;
+  }
+  return total;
 }
 
 /**
- * Gather every figure the Stats screen needs in a single batch of parallel
- * queries against {@link billEntries}.
+ * Most-tapped item over 30 days across open lines and saved bill JSON snapshots.
+ */
+export async function getMostUsed(userId: string): Promise<MostUsed | null> {
+  const since30 = sqlAppTodayMinus("30 days");
+  // Union open bill_entries with unnested saved_bills.items, then pick the top.
+  const rows = await db.execute(
+    sql`
+      select name, icon, sum(qty)::int as qty
+      from (
+        select ${items.name} as name, ${items.icon} as icon, ${billEntries.quantity} as qty
+        from ${billEntries}
+        inner join ${items} on ${items.id} = ${billEntries.itemId}
+        where ${billEntries.userId} = ${userId}
+          and ${billEntries.billDate} >= ${since30}
+
+        union all
+
+        select elem->>'name' as name,
+               elem->>'icon' as icon,
+               coalesce((elem->>'quantity')::int, 0) as qty
+        from ${savedBills}
+        cross join lateral jsonb_array_elements(${savedBills.items}) as elem
+        where ${savedBills.userId} = ${userId}
+          and ${savedBills.billDate} >= ${since30}
+      ) t
+      group by name, icon
+      order by sum(qty) desc
+      limit 1
+    `,
+  );
+
+  const list = (rows as unknown as { rows: Record<string, unknown>[] }).rows;
+  const top = list[0];
+  if (!top || typeof top.name !== "string") return null;
+  return {
+    name: top.name,
+    icon: typeof top.icon === "string" ? top.icon : null,
+  };
+}
+
+/**
+ * Every figure the Stats screen needs. Open-bill fields are kept separate so
+ * the client can overlay optimistic taps without double-counting saved spend.
  */
 export async function getStats(userId: string): Promise<StatsData> {
-  const [
-    todaySpend,
-    yesterdaySpend,
-    weekSpend,
-    monthSpend,
-    itemsTapped,
-    mostUsed,
-    weekly,
-  ] = await Promise.all([
-    sumSpendOnDay(userId, sql`CURRENT_DATE`),
-    sumSpendOnDay(userId, sql`(CURRENT_DATE - INTERVAL '1 day')::date`),
-    sumSpendFrom(userId, sql`date_trunc('week', CURRENT_DATE)::date`),
-    sumSpendFrom(userId, sql`date_trunc('month', CURRENT_DATE)::date`),
-    getItemsTapped(userId),
+  const todayDate = ymdInAppTimezone();
+  const yesterday = addDaysYmd(todayDate, -1);
+  const weekStart = startOfWeekYmd(todayDate);
+  const monthStart = startOfMonthYmd(todayDate);
+  const since30 = addDaysYmd(todayDate, -30);
+  const { start, endExclusive, dayCount } = monthRangeBounds(todayDate);
+
+  const [openRows, savedRows, mostUsed] = await Promise.all([
+    db
+      .select({
+        billDate: billEntries.billDate,
+        total: sql<string>`coalesce(sum(${billEntries.subtotal}), 0)`,
+        taps: sql<string>`coalesce(sum(${billEntries.quantity}), 0)`,
+      })
+      .from(billEntries)
+      .where(
+        and(
+          eq(billEntries.userId, userId),
+          sql`${billEntries.billDate} >= ${start}`,
+          sql`${billEntries.billDate} < ${endExclusive}`,
+        ),
+      )
+      .groupBy(billEntries.billDate),
+    db
+      .select({
+        billDate: savedBills.billDate,
+        total: sql<string>`coalesce(sum(${savedBills.total}), 0)`,
+        taps: sql<string>`coalesce(sum(${savedBills.itemCount}), 0)`,
+      })
+      .from(savedBills)
+      .where(
+        and(
+          eq(savedBills.userId, userId),
+          sql`${savedBills.billDate} >= ${start}`,
+          sql`${savedBills.billDate} < ${endExclusive}`,
+        ),
+      )
+      .groupBy(savedBills.billDate),
     getMostUsed(userId),
-    getWeekly(userId),
   ]);
 
+  const openByDay = new Map<string, DayAgg>();
+  for (const r of openRows) {
+    mergeDay(openByDay, r.billDate, num(r.total), num(r.taps));
+  }
+
+  const savedByDay = new Map<string, DayAgg>();
+  for (const r of savedRows) {
+    mergeDay(savedByDay, r.billDate, num(r.total), num(r.taps));
+  }
+
+  const combined = new Map<string, DayAgg>();
+  for (const [date, agg] of openByDay) {
+    mergeDay(combined, date, agg.spend, agg.taps);
+  }
+  for (const [date, agg] of savedByDay) {
+    mergeDay(combined, date, agg.spend, agg.taps);
+  }
+
+  const openToday = openByDay.get(todayDate) ?? { spend: 0, taps: 0 };
+
+  const weekly: DayTotal[] = DAY_LABELS.map((label, i) => {
+    const date = addDaysYmd(weekStart, i);
+    return {
+      label,
+      date,
+      value: combined.get(date)?.spend ?? 0,
+    };
+  });
+
+  const monthly: MonthDayTotal[] = Array.from({ length: dayCount }, (_, i) => {
+    const date = addDaysYmd(start, i);
+    return { date, value: combined.get(date)?.spend ?? 0 };
+  });
+
   return {
-    todaySpend,
-    yesterdaySpend,
-    weekSpend,
-    monthSpend,
-    itemsTapped,
+    todaySpend: combined.get(todayDate)?.spend ?? 0,
+    yesterdaySpend: combined.get(yesterday)?.spend ?? 0,
+    weekSpend: sumSpendFrom(combined, weekStart),
+    monthSpend: sumSpendFrom(combined, monthStart),
+    openTodaySpend: openToday.spend,
+    itemsTapped: sumTapsFrom(combined, since30),
+    todayTapCount: openToday.taps,
     mostUsed,
+    todayDate,
     weekly,
+    monthly,
   };
 }

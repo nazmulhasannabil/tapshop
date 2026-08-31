@@ -15,6 +15,20 @@
       "when": 1786601241347,
       "tag": "0001_icy_gideon",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1788202363797,
+      "tag": "0002_neat_reavers",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1788206630520,
+      "tag": "0003_organic_william_stryker",
+      "breakpoints": true
     }
   ]
 }

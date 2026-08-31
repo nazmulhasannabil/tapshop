@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { formatCurrency, formatRelativeTime } from "@/lib/constants";
+import { formatCurrency, formatRelativeTime, formatYmdDate } from "@/lib/constants";
 import type { Paginated, SavedBill } from "@/types/bill";
 
 /**
@@ -142,8 +142,6 @@ function Pagination({
 }
 
 /** Format a YYYY-MM-DD bill date as a readable label. */
-function formatBillDate(iso: string): string {
-  const date = new Date(`${iso}T00:00:00`);
-  if (Number.isNaN(date.getTime())) return iso;
-  return date.toLocaleDateString(undefined, { dateStyle: "medium" });
+function formatBillDate(ymd: string): string {
+  return formatYmdDate(ymd);
 }

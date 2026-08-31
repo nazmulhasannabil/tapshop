@@ -12,6 +12,9 @@ import { items, type Item } from "./items";
 import { billEntries, type BillEntry } from "./bill-entries";
 import { activityLogs, type ActivityLog } from "./activity-logs";
 import { savedBills, type SavedBillRow } from "./saved-bills";
+import { friendships, type Friendship } from "./friendships";
+import { friendInvites, type FriendInvite } from "./friend-invites";
+import { debtEntries, type DebtEntry } from "./debt-entries";
 
 export {
   users,
@@ -22,8 +25,22 @@ export {
   billEntries,
   activityLogs,
   savedBills,
+  friendships,
+  friendInvites,
+  debtEntries,
 };
-export type { User, Session, Account, Item, BillEntry, ActivityLog, SavedBillRow };
+export type {
+  User,
+  Session,
+  Account,
+  Item,
+  BillEntry,
+  ActivityLog,
+  SavedBillRow,
+  Friendship,
+  FriendInvite,
+  DebtEntry,
+};
 
 /* ---------------------------------- Enums --------------------------------- */
 
@@ -52,6 +69,17 @@ export const ACTION = {
   ADMIN_CHANGED_ITEM: "admin_changed_item",
 } as const;
 
+export {
+  FRIENDSHIP_STATUS,
+  FRIEND_INVITE_STATUS,
+  DEBT_STATUS,
+  DEBT_DIRECTION,
+  type FriendshipStatus,
+  type FriendInviteStatus,
+  type DebtStatus,
+  type DebtDirection,
+} from "@/lib/social-constants";
+
 /* -------------------------------- Relations ------------------------------- */
 
 export const usersRelations = relations(users, ({ many }) => ({
@@ -62,6 +90,12 @@ export const usersRelations = relations(users, ({ many }) => ({
   createdItems: many(items),
   activityAsActor: many(activityLogs, { relationName: "actor" }),
   activityAsTarget: many(activityLogs, { relationName: "target" }),
+  friendshipsRequested: many(friendships, { relationName: "requester" }),
+  friendshipsReceived: many(friendships, { relationName: "addressee" }),
+  friendInvitesSent: many(friendInvites),
+  debtsCreated: many(debtEntries, { relationName: "debtCreator" }),
+  debtsAsLender: many(debtEntries, { relationName: "debtLender" }),
+  debtsAsBorrower: many(debtEntries, { relationName: "debtBorrower" }),
 }));
 
 export const sessionsRelations = relations(sessions, ({ one }) => ({
@@ -96,5 +130,48 @@ export const activityLogsRelations = relations(activityLogs, ({ one }) => ({
     fields: [activityLogs.targetUserId],
     references: [users.id],
     relationName: "target",
+  }),
+}));
+
+export const friendshipsRelations = relations(friendships, ({ one, many }) => ({
+  requester: one(users, {
+    fields: [friendships.requesterId],
+    references: [users.id],
+    relationName: "requester",
+  }),
+  addressee: one(users, {
+    fields: [friendships.addresseeId],
+    references: [users.id],
+    relationName: "addressee",
+  }),
+  debtEntries: many(debtEntries),
+}));
+
+export const friendInvitesRelations = relations(friendInvites, ({ one }) => ({
+  inviter: one(users, {
+    fields: [friendInvites.inviterId],
+    references: [users.id],
+  }),
+}));
+
+export const debtEntriesRelations = relations(debtEntries, ({ one }) => ({
+  creator: one(users, {
+    fields: [debtEntries.createdBy],
+    references: [users.id],
+    relationName: "debtCreator",
+  }),
+  lender: one(users, {
+    fields: [debtEntries.lenderUserId],
+    references: [users.id],
+    relationName: "debtLender",
+  }),
+  borrower: one(users, {
+    fields: [debtEntries.borrowerUserId],
+    references: [users.id],
+    relationName: "debtBorrower",
+  }),
+  friendship: one(friendships, {
+    fields: [debtEntries.friendshipId],
+    references: [friendships.id],
   }),
 }));

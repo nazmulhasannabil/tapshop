@@ -1,12 +1,13 @@
 import { requireUser } from "@/lib/auth/server";
+import { getTodayBill } from "@/lib/services/billing";
 import { getSavedBills, SAVED_BILLS_PAGE_SIZE } from "@/lib/services/saved-bills";
+import { getStats } from "@/lib/services/stats";
 import { ActivityScreen } from "@/components/activity/activity-screen";
+import { StatsProvider } from "@/components/stats/stats-provider";
 
 /**
- * The Activity page — a paginated table of the user's saved bills.
- *
- * Pagination is URL-driven (`?page=N`). `searchParams` is an async Promise in
- * Next 16, so we await it; a missing/non-numeric page falls back to 1.
+ * Activity page — spend overview + paginated saved bills.
+ * Pagination is URL-driven (`?page=N`).
  */
 export default async function ActivityPage({
   searchParams,
@@ -19,7 +20,15 @@ export default async function ActivityPage({
   const rawPage = Array.isArray(params.page) ? params.page[0] : params.page;
   const page = Number(rawPage) || 1;
 
-  const result = await getSavedBills(session.user.id, page, SAVED_BILLS_PAGE_SIZE);
+  const [result, stats, todayBill] = await Promise.all([
+    getSavedBills(session.user.id, page, SAVED_BILLS_PAGE_SIZE),
+    getStats(session.user.id),
+    getTodayBill(session.user.id),
+  ]);
 
-  return <ActivityScreen page={result} />;
+  return (
+    <StatsProvider initialStats={stats} todayBill={todayBill}>
+      <ActivityScreen page={result} />
+    </StatsProvider>
+  );
 }

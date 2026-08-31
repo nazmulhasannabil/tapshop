@@ -1,5 +1,6 @@
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
+import { APP_TIMEZONE } from "@/lib/timezone";
 import * as schema from "./schema";
 
 /**
@@ -34,9 +35,17 @@ function resolvePoolConfig(connectionString: string) {
     .replace(/\?&/, "?")
     .replace(/[?&]$/, "");
 
+  // Default 5 so modest Promise.all fan-outs can use separate clients.
+  // Override with PG_POOL_MAX (use 1 on tiny serverless if connection pressure
+  // is an issue). Day buckets still use timezone() SQL — see `@/lib/timezone`.
+  const parsed = Number(process.env.PG_POOL_MAX);
+  const max = Number.isFinite(parsed) && parsed >= 1 ? Math.floor(parsed) : 5;
+
   return {
     connectionString: cleaned,
-    max: 1 as const,
+    max,
+    // Prefer app-local calendar for session CURRENT_DATE / defaults.
+    options: `-c TimeZone=${APP_TIMEZONE}`,
     ssl: isLocalPostgres(connectionString)
       ? undefined
       : ({ rejectUnauthorized: false } as const),
@@ -51,8 +60,21 @@ function createDb() {
     );
   }
 
-  const pool =
-    globalForPg.pgPool ?? new Pool(resolvePoolConfig(url));
+  const pool = globalForPg.pgPool ?? new Pool(resolvePoolConfig(url));
+
+  if (!globalForPg.pgPool) {
+    // Best-effort: pre-open clients so the first Promise.all does not pay
+    // several cold TLS handshakes mid-request. Failures are non-fatal.
+    const max = resolvePoolConfig(url).max;
+    void Promise.all(
+      Array.from({ length: max }, () => pool.query("select 1")),
+    ).catch(() => {});
+  }
+
+  // Do NOT run SET TIME ZONE in pool.on('connect') — a fire-and-forget query
+  // races with the first real query on the same Client (pg deprecation + stalls).
+  // Startup `options: -c TimeZone=…` above covers session timezone; day-bucket
+  // SQL uses timezone() expressions regardless.
 
   if (process.env.NODE_ENV !== "production") {
     globalForPg.pgPool = pool;

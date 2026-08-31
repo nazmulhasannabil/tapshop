@@ -1,7 +1,16 @@
+import { cache } from "react";
 import { and, asc, count, desc, eq, ne, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { users, billEntries, items, activityLogs } from "@/db/schema";
 import { formatRelativeTime } from "@/lib/constants";
+import {
+  APP_TIMEZONE,
+  ymdInAppTimezone,
+} from "@/lib/timezone";
+import {
+  sqlAppDateTrunc,
+  sqlAppToday,
+} from "@/lib/timezone-sql";
 import type {
   AdminStats,
   AdminUser,
@@ -77,7 +86,7 @@ async function getAdminStats(): Promise<AdminStats> {
       .where(
         and(
           ne(users.role, "admin"),
-          sql`${users.createdAt} >= date_trunc('week', CURRENT_DATE)`,
+          sql`${users.createdAt} >= ${sqlAppDateTrunc("week")}`,
         ),
       ),
 
@@ -85,21 +94,21 @@ async function getAdminStats(): Promise<AdminStats> {
     db
       .select({ total: sql<string>`coalesce(sum(${billEntries.subtotal}), 0)` })
       .from(billEntries)
-      .where(eq(billEntries.billDate, sql`CURRENT_DATE`)),
+      .where(eq(billEntries.billDate, sqlAppToday())),
 
     // Total spend this month (all users)
     db
       .select({ total: sql<string>`coalesce(sum(${billEntries.subtotal}), 0)` })
       .from(billEntries)
       .where(
-        sql`${billEntries.billDate} >= date_trunc('month', CURRENT_DATE)::date`,
+        sql`${billEntries.billDate} >= ${sqlAppDateTrunc("month")}`,
       ),
 
     // Distinct active users today
     db
       .select({ value: sql<string>`count(distinct ${billEntries.userId})` })
       .from(billEntries)
-      .where(eq(billEntries.billDate, sql`CURRENT_DATE`)),
+      .where(eq(billEntries.billDate, sqlAppToday())),
   ]);
 
   const totalUsers = num(totalRows[0]?.value);
@@ -118,16 +127,38 @@ async function getAdminStats(): Promise<AdminStats> {
   };
 }
 
+/** Monday YYYY-MM-DD of the current week in the app timezone. */
+function startOfWeekYmd(): string {
+  const today = ymdInAppTimezone();
+  const [y, m, d] = today.split("-").map(Number);
+  const dow = new Date(Date.UTC(y, m - 1, d)).getUTCDay(); // 0=Sun
+  const sinceMon = (dow + 6) % 7;
+  const monday = new Date(Date.UTC(y, m - 1, d - sinceMon));
+  const yy = monday.getUTCFullYear();
+  const mm = String(monday.getUTCMonth() + 1).padStart(2, "0");
+  const dd = String(monday.getUTCDate()).padStart(2, "0");
+  return `${yy}-${mm}-${dd}`;
+}
+
+/** Add `days` to a `YYYY-MM-DD` string in UTC calendar space (no TZ shift). */
+function addDaysYmd(ymd: string, days: number): string {
+  const [y, m, d] = ymd.split("-").map(Number);
+  const date = new Date(Date.UTC(y, m - 1, d + days));
+  const yy = date.getUTCFullYear();
+  const mm = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const dd = String(date.getUTCDate()).padStart(2, "0");
+  return `${yy}-${mm}-${dd}`;
+}
+
 /** Mon–Sun spending totals for the current week (zeros for empty days). */
 async function getAdminWeekly(): Promise<WeeklyData> {
-  const monday = startOfWeek();
-  const mondayStr = monday.toISOString().slice(0, 10);
+  const mondayStr = startOfWeekYmd();
 
-  const skeleton = DAY_LABELS.map((label, i) => {
-    const d = new Date(monday);
-    d.setDate(monday.getDate() + i);
-    return { label, key: d.toISOString().slice(0, 10), value: 0 };
-  });
+  const skeleton = DAY_LABELS.map((label, i) => ({
+    label,
+    key: addDaysYmd(mondayStr, i),
+    value: 0,
+  }));
 
   const rows = await db
     .select({
@@ -145,39 +176,39 @@ async function getAdminWeekly(): Promise<WeeklyData> {
 
 /** Recent activity feed — combines activity logs + new user registrations. */
 async function getRecentActivity(): Promise<RecentActivity[]> {
-  // 1. Recent activity logs (last 7 days)
-  const logRows = await db
-    .select({
-      id: activityLogs.id,
-      actorName: users.name,
-      action: activityLogs.action,
-      newValue: activityLogs.newValue,
-      createdAt: activityLogs.createdAt,
-    })
-    .from(activityLogs)
-    .innerJoin(users, eq(activityLogs.actorId, users.id))
-    .where(
-      sql`${activityLogs.createdAt} >= NOW() - INTERVAL '7 days'`,
-    )
-    .orderBy(desc(activityLogs.createdAt))
-    .limit(10);
-
-  // 2. Recent new users (last 7 days, exclude admins)
-  const newUsers = await db
-    .select({
-      id: users.id,
-      name: users.name,
-      createdAt: users.createdAt,
-    })
-    .from(users)
-    .where(
-      and(
-        ne(users.role, "admin"),
-        sql`${users.createdAt} >= NOW() - INTERVAL '7 days'`,
-      ),
-    )
-    .orderBy(desc(users.createdAt))
-    .limit(5);
+  // Independent queries — run in parallel.
+  const [logRows, newUsers] = await Promise.all([
+    db
+      .select({
+        id: activityLogs.id,
+        actorName: users.name,
+        action: activityLogs.action,
+        newValue: activityLogs.newValue,
+        createdAt: activityLogs.createdAt,
+      })
+      .from(activityLogs)
+      .innerJoin(users, eq(activityLogs.actorId, users.id))
+      .where(
+        sql`${activityLogs.createdAt} >= NOW() - INTERVAL '7 days'`,
+      )
+      .orderBy(desc(activityLogs.createdAt))
+      .limit(10),
+    db
+      .select({
+        id: users.id,
+        name: users.name,
+        createdAt: users.createdAt,
+      })
+      .from(users)
+      .where(
+        and(
+          ne(users.role, "admin"),
+          sql`${users.createdAt} >= NOW() - INTERVAL '7 days'`,
+        ),
+      )
+      .orderBy(desc(users.createdAt))
+      .limit(5),
+  ]);
 
   // Map activity logs
   const logActivity: RecentActivity[] = logRows.map((row) => {
@@ -289,7 +320,7 @@ export async function getAdminUsers(): Promise<AdminUser[]> {
         todayBill: sql<string>`coalesce(sum(${billEntries.subtotal}), 0)`,
       })
       .from(billEntries)
-      .where(eq(billEntries.billDate, sql`CURRENT_DATE`))
+      .where(eq(billEntries.billDate, sqlAppToday()))
       .groupBy(billEntries.userId),
 
     // Lifetime totals per user
@@ -310,7 +341,7 @@ export async function getAdminUsers(): Promise<AdminUser[]> {
       })
       .from(billEntries)
       .where(
-        sql`${billEntries.billDate} >= date_trunc('month', CURRENT_DATE)::date`,
+        sql`${billEntries.billDate} >= ${sqlAppDateTrunc("month")}`,
       )
       .groupBy(billEntries.userId),
   ]);
@@ -354,8 +385,9 @@ export type AdminUserDetails = {
 
 /**
  * Fetch a single user's profile + spending stats + recent transactions.
+ * Cached per-request so `generateMetadata` and the page share one load.
  */
-export async function getAdminUserDetails(
+export const getAdminUserDetails = cache(async function getAdminUserDetails(
   userId: string,
 ): Promise<AdminUserDetails | null> {
   const [userRow] = await db
@@ -383,7 +415,7 @@ export async function getAdminUserDetails(
       .select({ total: sql<string>`coalesce(sum(${billEntries.subtotal}), 0)` })
       .from(billEntries)
       .where(
-        and(eq(billEntries.userId, userId), eq(billEntries.billDate, sql`CURRENT_DATE`)),
+        and(eq(billEntries.userId, userId), eq(billEntries.billDate, sqlAppToday())),
       ),
 
     db
@@ -400,7 +432,7 @@ export async function getAdminUserDetails(
       .where(
         and(
           eq(billEntries.userId, userId),
-          sql`${billEntries.billDate} >= date_trunc('month', CURRENT_DATE)::date`,
+          sql`${billEntries.billDate} >= ${sqlAppDateTrunc("month")}`,
         ),
       ),
 
@@ -452,7 +484,7 @@ export async function getAdminUserDetails(
   }));
 
   return { user, transactions };
-}
+});
 
 // ---------------------------------------------------------------------------
 // Dashboard drill-downs
@@ -480,7 +512,7 @@ export async function getTodayBreakdown(): Promise<TodayBreakdownData> {
     })
     .from(billEntries)
     .innerJoin(users, eq(billEntries.userId, users.id))
-    .where(eq(billEntries.billDate, sql`CURRENT_DATE`))
+    .where(eq(billEntries.billDate, sqlAppToday()))
     .groupBy(billEntries.userId, users.id)
     .orderBy(desc(sql`sum(${billEntries.subtotal})`));
 
@@ -521,9 +553,7 @@ export async function getMonthBreakdown(): Promise<MonthBreakdownData> {
     })
     .from(billEntries)
     .innerJoin(users, eq(billEntries.userId, users.id))
-    .where(
-      sql`${billEntries.billDate} >= date_trunc('month', CURRENT_DATE)::date`,
-    )
+    .where(sql`${billEntries.billDate} >= ${sqlAppDateTrunc("month")}`)
     .groupBy(billEntries.userId, users.id)
     .orderBy(desc(sql`sum(${billEntries.subtotal})`));
 
@@ -559,7 +589,7 @@ export async function getActiveTodayUsers(): Promise<ActiveTodayUser[]> {
     })
     .from(billEntries)
     .innerJoin(users, eq(billEntries.userId, users.id))
-    .where(eq(billEntries.billDate, sql`CURRENT_DATE`))
+    .where(eq(billEntries.billDate, sqlAppToday()))
     .groupBy(billEntries.userId, users.id)
     .orderBy(desc(sql`sum(${billEntries.subtotal})`));
 
@@ -577,15 +607,6 @@ export async function getActiveTodayUsers(): Promise<ActiveTodayUser[]> {
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Monday 00:00 (local time) of the current week. */
-function startOfWeek(): Date {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  const diff = (d.getDay() + 6) % 7; // days since Monday (0 = Monday)
-  d.setDate(d.getDate() - diff);
-  return d;
-}
-
 /** Determine active/offline status based on last activity. */
 function userStatus(
   lastActiveAt: Date | null,
@@ -602,6 +623,7 @@ function userStatus(
 /** Format a date as "Mon 5, Aug 2026" for display. */
 function formatDate(date: Date): string {
   return date.toLocaleDateString("en-US", {
+    timeZone: APP_TIMEZONE,
     month: "short",
     day: "numeric",
     year: "numeric",

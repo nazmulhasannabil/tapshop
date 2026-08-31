@@ -1,15 +1,16 @@
 import { eq, sql } from "drizzle-orm";
 
 import { db } from "@/db";
-import { billEntries, users } from "@/db/schema";
+import { billEntries, savedBills, users } from "@/db/schema";
 import { getMostUsed, type MostUsed } from "@/lib/services/stats";
+import { APP_TIMEZONE } from "@/lib/timezone";
 
 /**
  * Profile-screen aggregation.
  *
- * Like {@link getStats}, all figures are derived from {@link billEntries}
- * (one row per user/item/day with snapshot `subtotal`). The only user-table
- * read here is `users.created_at`, used for the "Member since" label.
+ * Lifetime spend = open {@link billEntries} + finalized {@link savedBills}
+ * (saving moves spend from open lines into snapshots). Favorite item reuses
+ * the Stats 30-day aggregator. `users.created_at` drives "Member since".
  */
 
 /** Numeric columns come back as strings from Drizzle; coerce for the client. */
@@ -17,7 +18,7 @@ const num = (v: string | number | null | undefined): number => Number(v ?? 0);
 
 /** Serializable payload handed to the `<ProfileView />` client component. */
 export type ProfileData = {
-  /** Lifetime spend across every bill entry (no date window). */
+  /** Lifetime spend across open lines and saved bill snapshots. */
   totalConsumption: number;
   /** Most-tapped item over the trailing 30 days, reused from Stats. */
   favoriteItem: MostUsed | null;
@@ -26,6 +27,7 @@ export type ProfileData = {
 };
 
 const memberSinceFormatter = new Intl.DateTimeFormat("en-US", {
+  timeZone: APP_TIMEZONE,
   month: "long",
   year: "numeric",
 });
@@ -35,11 +37,15 @@ const memberSinceFormatter = new Intl.DateTimeFormat("en-US", {
  * queries. Safe to call from a server component.
  */
 export async function getProfileData(userId: string): Promise<ProfileData> {
-  const [lifetimeRow, userRow, favoriteItem] = await Promise.all([
+  const [openRow, savedRow, userRow, favoriteItem] = await Promise.all([
     db
       .select({ total: sql<string>`coalesce(sum(${billEntries.subtotal}), 0)` })
       .from(billEntries)
       .where(eq(billEntries.userId, userId)),
+    db
+      .select({ total: sql<string>`coalesce(sum(${savedBills.total}), 0)` })
+      .from(savedBills)
+      .where(eq(savedBills.userId, userId)),
     db
       .select({ createdAt: users.createdAt })
       .from(users)
@@ -49,7 +55,7 @@ export async function getProfileData(userId: string): Promise<ProfileData> {
   ]);
 
   return {
-    totalConsumption: num(lifetimeRow[0]?.total),
+    totalConsumption: num(openRow[0]?.total) + num(savedRow[0]?.total),
     favoriteItem,
     memberSinceLabel: memberSinceFormatter.format(userRow[0]?.createdAt ?? new Date()),
   };
