@@ -4,11 +4,19 @@ import { ymdInAppTimezone } from "@/lib/timezone";
 
 export const APP_NAME = "TapShop";
 
+export const APP_MOTTO = "Add your bill in a single tap";
+
+/** Cookie set after the first onboarding splash so repeat visits skip it. */
+export const ONBOARDING_COOKIE = "tapshop_onboarding_done";
+
 /**
  * Default daily spending target (৳) used by the home screen's "Today's Bill"
  * progress bar. Purely a client-side visual reference — not stored or enforced.
  */
 export const DEFAULT_DAILY_TARGET = 500;
+
+/** Rows per page on the Activity saved-bills table. */
+export const SAVED_BILLS_PAGE_SIZE = 10;
 
 /**
  * Format an amount as Bangladeshi Taka with the ৳ symbol.

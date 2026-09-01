@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { and, asc, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { activityLogs, billEntries, items } from "@/db/schema";
@@ -26,7 +27,7 @@ function toCatalogItem(row: {
 /* --------------------------------- Reads ---------------------------------- */
 
 /** All active items, alphabetically (the "All Items" grid). */
-export async function getActiveItems(): Promise<CatalogItem[]> {
+export const getActiveItems = cache(async function getActiveItems(): Promise<CatalogItem[]> {
   const rows = await db
     .select({
       id: items.id,
@@ -39,10 +40,10 @@ export async function getActiveItems(): Promise<CatalogItem[]> {
     .orderBy(asc(items.name));
 
   return rows.map(toCatalogItem);
-}
+});
 
 /** Today's bill for a user (the lines under "Today's Bill"). */
-export async function getTodayBill(userId: string): Promise<BillLine[]> {
+export const getTodayBill = cache(async function getTodayBill(userId: string): Promise<BillLine[]> {
   const rows = await db
     .select({
       itemId: billEntries.itemId,
@@ -65,7 +66,7 @@ export async function getTodayBill(userId: string): Promise<BillLine[]> {
     quantity: r.quantity,
     subtotal: num(r.subtotal),
   }));
-}
+});
 
 /** Items the user has consumed most recently (fast re-tap targets). */
 export async function getRecentItems(userId: string, limit = 8): Promise<CatalogItem[]> {

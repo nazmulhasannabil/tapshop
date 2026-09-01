@@ -2,6 +2,7 @@ import { and, count, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { billEntries, items, savedBills } from "@/db/schema";
 import { BillingError } from "@/lib/services/billing";
+import { SAVED_BILLS_PAGE_SIZE } from "@/lib/constants";
 import { sqlAppToday } from "@/lib/timezone-sql";
 import type {
   Paginated,
@@ -12,9 +13,6 @@ import type {
 
 /** Numeric columns come back as strings from Drizzle; coerce for the client. */
 const num = (v: string | number): number => Number(v);
-
-/** Rows per page on the Activity table. */
-export const SAVED_BILLS_PAGE_SIZE = 10;
 
 /**
  * Save today's bill as an immutable `saved_bills` snapshot, THEN clear today's

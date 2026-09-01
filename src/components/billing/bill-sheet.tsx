@@ -15,6 +15,7 @@ import { formatCurrency } from "@/lib/constants";
 import { displayedQty, useBillLineList, useBillTotals } from "@/stores/bill-store";
 import { useBill } from "@/hooks/use-bill";
 import { useSavedBill } from "@/hooks/use-saved-bills";
+import { useSession } from "@/lib/auth/client";
 import { AnimatedTotal } from "./animated-total";
 import { EmptyState } from "./empty-state";
 
@@ -28,7 +29,9 @@ export function BillSheet({
   const lines = useBillLineList();
   const { count, total } = useBillTotals();
   const { addItem, decreaseItem, removeEntry } = useBill();
-  const { saveBill } = useSavedBill();
+  const { data: session } = useSession();
+  const userId = session?.user?.id ?? "";
+  const { saveBill } = useSavedBill(userId);
   const [saving, setSaving] = useState(false);
 
   const canSave = count > 0 && !saving;

@@ -15,7 +15,7 @@ import {
 import {
   inviteRegisterUrl,
   sendFriendInviteEmail,
-} from "@/lib/email/resend";
+} from "@/lib/email/invite-email";
 import { betterAuthUrl } from "@/lib/config/env";
 
 function appOrigin(): string {
@@ -23,6 +23,16 @@ function appOrigin(): string {
 }
 
 const INVITE_TTL_MS = 14 * 24 * 60 * 60 * 1000;
+
+function inviteEmailMessage(
+  recipient: string,
+  mail: { sent: boolean; error?: string },
+  sentLabel: string,
+): string {
+  if (mail.sent) return sentLabel;
+  const hint = mail.error ? ` ${mail.error}` : "";
+  return `Invite created for ${recipient}. Share the link below.${hint}`;
+}
 
 export type FriendUser = {
   id: string;
@@ -299,7 +309,11 @@ export async function inviteFriend(
         friendshipId: pair.id,
         inviteUrl: friendsUrl,
         emailSent: mail.sent,
-        message: `Friend request sent to ${target.name}.`,
+        message: inviteEmailMessage(
+          target.name,
+          mail,
+          `Friend request sent to ${target.name}.`,
+        ),
       };
     }
 
@@ -324,7 +338,11 @@ export async function inviteFriend(
       friendshipId: created.id,
       inviteUrl: friendsUrl,
       emailSent: mail.sent,
-      message: `Friend request sent to ${target.name}.`,
+      message: inviteEmailMessage(
+        target.name,
+        mail,
+        `Friend request sent to ${target.name}.`,
+      ),
     };
   }
 
@@ -376,9 +394,11 @@ export async function inviteFriend(
     token: invite.token,
     inviteUrl,
     emailSent: mail.sent,
-    message: mail.sent
-      ? `Invite sent to ${normalized}.`
-      : `Invite created. Share the link with ${normalized}.`,
+    message: inviteEmailMessage(
+      normalized,
+      mail,
+      `Invite sent to ${normalized}.`,
+    ),
   };
 }
 

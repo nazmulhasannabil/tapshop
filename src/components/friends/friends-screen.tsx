@@ -1,11 +1,12 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   Check,
   Loader2,
+  UserMinus,
   UserPlus,
   Users,
   X,
@@ -14,68 +15,86 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { InviteFriendSheet } from "@/components/friends/invite-friend-sheet";
+import {
+  useAcceptFriend,
+  useDeclineFriend,
+  useFriends,
+  useRemoveFriend,
+} from "@/hooks/queries/use-friends";
 import { formatCurrency } from "@/lib/constants";
+import { queryKeys } from "@/lib/query/keys";
 import type { FriendsOverview, FriendshipListItem } from "@/lib/services/friends";
-import type { ApiResult } from "@/types/bill";
 import { cn } from "@/lib/utils";
 
 export function FriendsScreen({
+  userId,
   initial,
   highlightFriendshipId,
 }: {
+  userId: string;
   initial: FriendsOverview;
   highlightFriendshipId?: string | null;
 }) {
-  const router = useRouter();
-  const [local, setLocal] = useState<FriendsOverview | null>(null);
-  const data = local ?? initial;
+  const queryClient = useQueryClient();
+  const { data = initial } = useFriends(userId, initial);
   const [inviteOpen, setInviteOpen] = useState(false);
-  const [busyId, setBusyId] = useState<string | null>(null);
 
-  const refresh = useCallback(async () => {
-    const res = await fetch("/api/friends");
-    const json = (await res.json()) as ApiResult<FriendsOverview>;
-    if (json.ok) setLocal(json.data);
-    router.refresh();
-  }, [router]);
+  const acceptMutation = useAcceptFriend(userId);
+  const declineMutation = useDeclineFriend(userId);
+  const removeMutation = useRemoveFriend(userId);
+
+  const busyId =
+    acceptMutation.isPending
+      ? acceptMutation.variables
+      : declineMutation.isPending
+        ? declineMutation.variables
+        : removeMutation.isPending
+          ? removeMutation.variables
+          : null;
 
   async function accept(friendshipId: string) {
-    setBusyId(friendshipId);
     try {
-      const res = await fetch("/api/friends/accept", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ friendshipId }),
-      });
-      const json = (await res.json()) as ApiResult<unknown>;
-      if (!json.ok) {
-        toast.error(json.error);
-        return;
-      }
+      await acceptMutation.mutateAsync(friendshipId);
       toast.success("You're friends now");
-      await refresh();
-    } finally {
-      setBusyId(null);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not accept request.");
     }
   }
 
   async function decline(friendshipId: string) {
-    setBusyId(friendshipId);
     try {
-      const res = await fetch("/api/friends/decline", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ friendshipId }),
-      });
-      const json = (await res.json()) as ApiResult<unknown>;
-      if (!json.ok) {
-        toast.error(json.error);
-        return;
-      }
+      await declineMutation.mutateAsync(friendshipId);
       toast.message("Request declined");
-      await refresh();
-    } finally {
-      setBusyId(null);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not decline request.");
+    }
+  }
+
+  async function cancelOutgoing(friendshipId: string) {
+    try {
+      await declineMutation.mutateAsync(friendshipId);
+      toast.message("Request cancelled");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not cancel request.");
+    }
+  }
+
+  function confirmRemove(item: FriendshipListItem) {
+    toast(`Remove ${item.user.name}?`, {
+      description: "They will no longer appear in your friends list.",
+      action: {
+        label: "Remove",
+        onClick: () => void removeFriend(item.friendshipId),
+      },
+    });
+  }
+
+  async function removeFriend(friendshipId: string) {
+    try {
+      await removeMutation.mutateAsync(friendshipId);
+      toast.success("Friend removed");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not remove friend.");
     }
   }
 
@@ -99,7 +118,7 @@ export function FriendsScreen({
           <h3 className="px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             Friend requests
           </h3>
-          <div className="overflow-hidden rounded-3xl bg-card shadow-sm ring-1 ring-foreground/5">
+          <div className="overflow-hidden rounded-2xl bg-card shadow-sm ring-1 ring-foreground/5">
             <ul className="divide-y divide-border">
               {data.pendingIncoming.map((item) => (
                 <PendingRow
@@ -107,8 +126,8 @@ export function FriendsScreen({
                   item={item}
                   highlight={item.friendshipId === highlightFriendshipId}
                   busy={busyId === item.friendshipId}
-                  onAccept={() => accept(item.friendshipId)}
-                  onDecline={() => decline(item.friendshipId)}
+                  onAccept={() => void accept(item.friendshipId)}
+                  onDecline={() => void decline(item.friendshipId)}
                 />
               ))}
             </ul>
@@ -121,7 +140,7 @@ export function FriendsScreen({
           <h3 className="px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             Sent
           </h3>
-          <div className="overflow-hidden rounded-3xl bg-card shadow-sm ring-1 ring-foreground/5">
+          <div className="overflow-hidden rounded-2xl bg-card shadow-sm ring-1 ring-foreground/5">
             <ul className="divide-y divide-border">
               {data.pendingOutgoing.map((item) => (
                 <li
@@ -137,6 +156,19 @@ export function FriendsScreen({
                       Pending · {item.user.email}
                     </p>
                   </div>
+                  <Button
+                    size="icon-sm"
+                    variant="outline"
+                    disabled={busyId === item.friendshipId}
+                    onClick={() => void cancelOutgoing(item.friendshipId)}
+                    aria-label="Cancel request"
+                  >
+                    {busyId === item.friendshipId ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                      <X className="size-4" />
+                    )}
+                  </Button>
                 </li>
               ))}
             </ul>
@@ -149,7 +181,7 @@ export function FriendsScreen({
           Your friends
         </h3>
         {data.friends.length === 0 ? (
-          <div className="flex flex-col items-center gap-3 rounded-3xl bg-card px-6 py-10 text-center shadow-sm ring-1 ring-foreground/5">
+          <div className="flex flex-col items-center gap-3 rounded-2xl bg-card px-6 py-10 text-center shadow-sm ring-1 ring-foreground/5">
             <Users className="size-8 text-muted-foreground" />
             <p className="font-semibold text-foreground">No friends yet</p>
             <p className="text-sm text-muted-foreground">
@@ -161,13 +193,16 @@ export function FriendsScreen({
             </Button>
           </div>
         ) : (
-          <div className="overflow-hidden rounded-3xl bg-card shadow-sm ring-1 ring-foreground/5">
+          <div className="overflow-hidden rounded-2xl bg-card shadow-sm ring-1 ring-foreground/5">
             <ul className="divide-y divide-border">
               {data.friends.map((item) => (
-                <li key={item.friendshipId}>
+                <li
+                  key={item.friendshipId}
+                  className="flex items-center gap-2 px-4 py-3"
+                >
                   <Link
                     href={`/debts?friend=${encodeURIComponent(item.user.id)}`}
-                    className="flex items-center gap-3 px-4 py-3 transition hover:bg-muted/40"
+                    className="flex min-w-0 flex-1 items-center gap-3 transition hover:opacity-80"
                   >
                     <Avatar initial={item.user.name} image={item.user.image} />
                     <div className="min-w-0 flex-1">
@@ -180,6 +215,19 @@ export function FriendsScreen({
                     </div>
                     <BalanceBadge net={item.netBalance} />
                   </Link>
+                  <Button
+                    size="icon-sm"
+                    variant="ghost"
+                    disabled={busyId === item.friendshipId}
+                    onClick={() => confirmRemove(item)}
+                    aria-label={`Remove ${item.user.name}`}
+                  >
+                    {busyId === item.friendshipId ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                      <UserMinus className="size-4 text-muted-foreground" />
+                    )}
+                  </Button>
                 </li>
               ))}
             </ul>
@@ -190,7 +238,9 @@ export function FriendsScreen({
       <InviteFriendSheet
         open={inviteOpen}
         onOpenChange={setInviteOpen}
-        onInvited={refresh}
+        onInvited={() => {
+          void queryClient.invalidateQueries({ queryKey: queryKeys.friends(userId) });
+        }}
       />
     </main>
   );

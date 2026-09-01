@@ -2,6 +2,7 @@
 
 import { useCallback } from "react";
 import { toast } from "sonner";
+import { postJson } from "@/lib/api/client";
 import { useBillStore } from "@/stores/bill-store";
 import type {
   AddItemResult,
@@ -9,20 +10,6 @@ import type {
   CatalogItem,
   DecreaseItemResult,
 } from "@/types/bill";
-
-async function postJson<T>(url: string, body: unknown): Promise<ApiResult<T>> {
-  try {
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-      credentials: "include",
-    });
-    return (await res.json()) as ApiResult<T>;
-  } catch {
-    return { ok: false, error: "Network hiccup — check your connection." };
-  }
-}
 
 /**
  * Wires the optimistic Zustand store to the /api/bill route handlers.

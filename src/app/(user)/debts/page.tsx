@@ -14,11 +14,12 @@ export default async function DebtsPage({
 
   const [summary, groups] = await Promise.all([
     getDebtSummary(session.user.id),
-    groupDebts(session.user.id, DEBT_STATUS.OPEN),
+    groupDebts(session.user.id, DEBT_STATUS.OPEN, friendRaw ?? undefined),
   ]);
 
   return (
     <DebtsScreen
+      userId={session.user.id}
       initialSummary={summary}
       initialGroups={groups}
       friendFilterId={friendRaw ?? null}

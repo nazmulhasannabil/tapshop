@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Plus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useBillStore, useBillTotals } from "@/stores/bill-store";
+import { useHydrateBillStore } from "@/hooks/use-hydrate-bill-store";
+import { useBillTotals } from "@/stores/bill-store";
 import { DEFAULT_DAILY_TARGET } from "@/lib/constants";
 import { useSpendMilestone } from "@/hooks/use-spend-milestone";
 import type { BillLine, CatalogItem } from "@/types/bill";
@@ -32,16 +33,12 @@ export function BillingScreen({
   const [billOpen, setBillOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
 
-  const hydrate = useBillStore((s) => s.hydrate);
   const { count, total } = useBillTotals();
 
   // Toast when today's bill crosses each 100৳ milestone (100/200/300…).
   useSpendMilestone(total);
 
-  // Hydrate the optimistic store with today's authoritative bill (once).
-  useEffect(() => {
-    hydrate(todayBill);
-  }, [hydrate, todayBill]);
+  useHydrateBillStore(todayBill);
 
   // Move a just-tapped / just-created item to the front of Recently Used.
   function bumpRecent(item: CatalogItem) {
@@ -61,23 +58,23 @@ export function BillingScreen({
         {/* Today's bill card */}
         <section
           aria-label="Today's bill"
-          className="rounded-2xl bg-card p-5 shadow-sm ring-1 ring-foreground/5"
+          className="rounded-2xl bg-card p-4 shadow-sm ring-1 ring-foreground/5"
         >
           <div className="flex items-center justify-between">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Today&apos;s Bill
             </p>
-            <span className="rounded-full bg-accent px-2.5 py-1 text-xs font-medium text-accent-foreground">
+            <span className="rounded-full bg-accent px-2 py-0.5 text-xs font-medium text-accent-foreground">
               {count} {count === 1 ? "item" : "items"}
             </span>
           </div>
           <AnimatedTotal
             value={total}
-            className="mt-1 block text-4xl font-bold tracking-tight text-foreground"
+            className="mt-0.5 block text-3xl font-bold tracking-tight text-foreground"
           />
           {/* Progress toward the daily spending target */}
           <div
-            className="mt-4 h-2.5 w-full overflow-hidden rounded-full bg-accent"
+            className="mt-2.5 h-2 w-full overflow-hidden rounded-full bg-accent"
             role="progressbar"
             aria-valuemin={0}
             aria-valuemax={100}
@@ -145,7 +142,7 @@ export function BillingScreenSkeleton() {
   return (
     <div className="mx-auto flex min-h-[100dvh] w-full max-w-md flex-col px-4 pt-6">
       <Skeleton className="h-4 w-24" />
-      <Skeleton className="mt-4 h-28 w-full rounded-2xl" />
+      <Skeleton className="mt-4 h-24 w-full rounded-2xl" />
       <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3">
         {Array.from({ length: 6 }).map((_, i) => (
           <Skeleton key={i} className="aspect-square rounded-2xl" />

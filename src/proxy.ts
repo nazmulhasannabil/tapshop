@@ -27,22 +27,27 @@ import {
  * Runtime is nodejs (the only runtime supported for `proxy`).
  */
 
-const PUBLIC_PATHS = ["/login", "/register"];
+const AUTH_PUBLIC_PATHS = ["/login", "/register"];
 
-function isPublicPath(pathname: string) {
-  return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+function isAuthPublicPath(pathname: string) {
+  return AUTH_PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+}
+
+function isEntryPath(pathname: string) {
+  return pathname === "/";
 }
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const isPublic = isPublicPath(pathname);
+  const isAuthPublic = isAuthPublicPath(pathname);
+  const isEntry = isEntryPath(pathname);
 
   // Same check the pages use, so the proxy and the server can never disagree.
   const session = await auth.api.getSession({ headers: request.headers });
   const hasSession = !!session;
 
   // Send logged-in users away from the auth pages.
-  if (hasSession && isPublic) {
+  if (hasSession && isAuthPublic) {
     const invite = request.nextUrl.searchParams.get("invite");
     if (invite) {
       return NextResponse.redirect(
@@ -53,7 +58,7 @@ export async function proxy(request: NextRequest) {
   }
 
   // Send logged-out users to login when they hit a protected route.
-  if (!hasSession && !isPublic) {
+  if (!hasSession && !isAuthPublic && !isEntry) {
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("redirect", pathname);
     return NextResponse.redirect(loginUrl);

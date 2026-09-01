@@ -1,8 +1,10 @@
+import { Suspense } from "react";
 import { requireUser } from "@/lib/auth/server";
 import { getTodayBill } from "@/lib/services/billing";
-import { getSavedBills, SAVED_BILLS_PAGE_SIZE } from "@/lib/services/saved-bills";
 import { getStats } from "@/lib/services/stats";
 import { ActivityScreen } from "@/components/activity/activity-screen";
+import { SavedBillsSection } from "@/components/activity/saved-bills-section";
+import { SavedBillsSkeleton } from "@/components/activity/saved-bills-skeleton";
 import { StatsProvider } from "@/components/stats/stats-provider";
 
 /**
@@ -20,15 +22,22 @@ export default async function ActivityPage({
   const rawPage = Array.isArray(params.page) ? params.page[0] : params.page;
   const page = Number(rawPage) || 1;
 
-  const [result, stats, todayBill] = await Promise.all([
-    getSavedBills(session.user.id, page, SAVED_BILLS_PAGE_SIZE),
+  const [stats, todayBill] = await Promise.all([
     getStats(session.user.id),
     getTodayBill(session.user.id),
   ]);
 
   return (
-    <StatsProvider initialStats={stats} todayBill={todayBill}>
-      <ActivityScreen page={result} />
+    <StatsProvider
+      userId={session.user.id}
+      initialStats={stats}
+      todayBill={todayBill}
+    >
+      <ActivityScreen>
+        <Suspense fallback={<SavedBillsSkeleton />}>
+          <SavedBillsSection page={page} />
+        </Suspense>
+      </ActivityScreen>
     </StatsProvider>
   );
 }

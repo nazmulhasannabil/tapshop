@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { billEntries, items, savedBills } from "@/db/schema";
@@ -191,7 +192,7 @@ export async function getMostUsed(userId: string): Promise<MostUsed | null> {
  * Every figure the Stats screen needs. Open-bill fields are kept separate so
  * the client can overlay optimistic taps without double-counting saved spend.
  */
-export async function getStats(userId: string): Promise<StatsData> {
+export const getStats = cache(async function getStats(userId: string): Promise<StatsData> {
   const todayDate = ymdInAppTimezone();
   const yesterday = addDaysYmd(todayDate, -1);
   const weekStart = startOfWeekYmd(todayDate);
@@ -280,4 +281,4 @@ export async function getStats(userId: string): Promise<StatsData> {
     weekly,
     monthly,
   };
-}
+});

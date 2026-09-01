@@ -137,8 +137,9 @@ export async function listDebts(
 export async function groupDebts(
   userId: string,
   status: string = DEBT_STATUS.OPEN,
+  friendUserId?: string,
 ): Promise<DebtGroup[]> {
-  const debts = await listDebts(userId, { status });
+  const debts = await listDebts(userId, { status, friendUserId });
   const map = new Map<string, DebtGroup>();
 
   for (const d of debts) {

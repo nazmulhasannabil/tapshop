@@ -21,6 +21,7 @@ import { Label } from "@/components/ui/label";
 import { DEBT_DIRECTION } from "@/lib/social-constants";
 import { todayKey } from "@/lib/constants";
 import { cn } from "@/lib/utils";
+import { useCreateDebt } from "@/hooks/queries/use-debts";
 import type { FriendUser } from "@/lib/services/friends";
 import type { DebtDto } from "@/lib/services/debts";
 import type { ApiResult } from "@/types/bill";
@@ -41,15 +42,17 @@ type AddDebtFormValues = z.infer<typeof addDebtFormSchema>;
 export function AddDebtSheet({
   open,
   onOpenChange,
+  userId,
   onCreated,
   onAddFriend,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onCreated: (debt: DebtDto) => void;
+  userId: string;
+  onCreated?: (debt: DebtDto) => void;
   onAddFriend: () => void;
 }) {
-  const [pending, setPending] = useState(false);
+  const createDebt = useCreateDebt(userId);
   const [selectedFriend, setSelectedFriend] = useState<FriendUser | null>(null);
   const [suggestions, setSuggestions] = useState<FriendUser[]>([]);
   const [searching, setSearching] = useState(false);
@@ -125,32 +128,20 @@ export function AddDebtSheet({
   );
 
   async function onSubmit(values: AddDebtFormValues) {
-    setPending(true);
     try {
-      const res = await fetch("/api/debts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          direction: values.direction,
-          counterpartyName: values.counterpartyName,
-          counterpartyUserId: selectedFriend?.id ?? null,
-          amount: Number(values.amount),
-          occurredOn: values.occurredOn,
-          note: values.note || null,
-        }),
+      const debt = await createDebt.mutateAsync({
+        direction: values.direction,
+        counterpartyName: values.counterpartyName,
+        counterpartyUserId: selectedFriend?.id ?? null,
+        amount: Number(values.amount),
+        occurredOn: values.occurredOn,
+        note: values.note || null,
       });
-      const json = (await res.json()) as ApiResult<DebtDto>;
-      if (!json.ok) {
-        toast.error(json.error);
-        return;
-      }
       toast.success("Debt saved");
-      onCreated(json.data);
+      onCreated?.(debt);
       onOpenChange(false);
     } catch {
       toast.error("Couldn't save debt.");
-    } finally {
-      setPending(false);
     }
   }
 
@@ -284,9 +275,9 @@ export function AddDebtSheet({
           </div>
 
           <SheetFooter className="border-t">
-            <Button type="submit" size="lg" disabled={pending} className="h-11 w-full text-base">
-              {pending && <Loader2 className="animate-spin" />}
-              {pending ? "Saving…" : "Save debt"}
+            <Button type="submit" size="lg" disabled={createDebt.isPending} className="h-11 w-full text-base">
+              {createDebt.isPending && <Loader2 className="animate-spin" />}
+              {createDebt.isPending ? "Saving…" : "Save debt"}
             </Button>
           </SheetFooter>
         </form>

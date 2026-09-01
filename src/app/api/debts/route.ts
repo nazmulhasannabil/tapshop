@@ -15,7 +15,11 @@ export async function GET(request: Request) {
   const grouped = searchParams.get("grouped") === "1";
 
   if (grouped) {
-    const groups = await groupDebts(session.user.id, status ?? DEBT_STATUS.OPEN);
+    const groups = await groupDebts(
+      session.user.id,
+      status ?? DEBT_STATUS.OPEN,
+      friendUserId,
+    );
     return ok(groups);
   }
 

@@ -16,6 +16,7 @@ export default async function FriendsPage({
 
   return (
     <FriendsPageClient
+      userId={session.user.id}
       initial={overview}
       inviteToken={inviteRaw ?? null}
       highlightFriendshipId={requestRaw ?? null}

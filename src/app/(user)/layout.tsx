@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { requireUser } from "@/lib/auth/server";
 import { AppHeader } from "@/components/nav/app-header";
 import { BottomNav } from "@/components/nav/bottom-nav";
+import { QueryProvider } from "@/components/providers/query-provider";
 
 /**
  * Layout for authenticated app screens. Renders the common top app bar above
@@ -16,10 +17,10 @@ export default async function UserLayout({ children }: { children: ReactNode }) 
   const isAdmin = session.user.role === "admin";
 
   return (
-    <>
+    <QueryProvider>
       <AppHeader isAdmin={isAdmin} />
       {children}
-      <BottomNav />
-    </>
+      <BottomNav userId={session.user.id} />
+    </QueryProvider>
   );
 }

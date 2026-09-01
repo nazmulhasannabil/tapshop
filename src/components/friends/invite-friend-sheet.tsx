@@ -79,6 +79,9 @@ export function InviteFriendSheet({
         return;
       }
       toast.success(json.data.message);
+      if (!json.data.emailSent) {
+        toast.warning("Email was not sent — use the link below.");
+      }
       setInviteUrl(json.data.inviteUrl);
       onInvited?.();
     } catch {
