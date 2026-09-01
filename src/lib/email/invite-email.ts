@@ -4,13 +4,9 @@
  * invite flows still work via copyable links.
  */
 
-import { betterAuthUrl, isDev } from "@/lib/config/env";
+import { appUrl, isDev } from "@/lib/config/env";
 
 export type SendEmailResult = { sent: boolean; error?: string };
-
-function appOrigin(): string {
-  return betterAuthUrl || process.env.BETTER_AUTH_URL || "http://localhost:3000";
-}
 
 function formatEmailJsError(status: number, text: string): string {
   const body = text.trim();
@@ -27,11 +23,11 @@ function formatEmailJsError(status: number, text: string): string {
 }
 
 export function inviteRegisterUrl(token: string): string {
-  return `${appOrigin()}/register?invite=${encodeURIComponent(token)}`;
+  return `${appUrl}/register?invite=${encodeURIComponent(token)}`;
 }
 
 export function inviteLoginUrl(token: string): string {
-  return `${appOrigin()}/login?invite=${encodeURIComponent(token)}`;
+  return `${appUrl}/login?invite=${encodeURIComponent(token)}`;
 }
 
 export async function sendFriendInviteEmail(opts: {

@@ -16,11 +16,7 @@ import {
   inviteRegisterUrl,
   sendFriendInviteEmail,
 } from "@/lib/email/invite-email";
-import { betterAuthUrl } from "@/lib/config/env";
-
-function appOrigin(): string {
-  return betterAuthUrl || process.env.BETTER_AUTH_URL || "http://localhost:3000";
-}
+import { appUrl } from "@/lib/config/env";
 
 const INVITE_TTL_MS = 14 * 24 * 60 * 60 * 1000;
 
@@ -298,7 +294,7 @@ export async function inviteFriend(
         })
         .where(eq(friendships.id, pair.id));
 
-      const friendsUrl = `${appOrigin()}/friends`;
+      const friendsUrl = `${appUrl}/friends`;
       const mail = await sendFriendInviteEmail({
         to: normalized,
         inviterName,
@@ -326,7 +322,7 @@ export async function inviteFriend(
       })
       .returning();
 
-    const friendsUrl = `${appOrigin()}/friends`;
+    const friendsUrl = `${appUrl}/friends`;
     const mail = await sendFriendInviteEmail({
       to: normalized,
       inviterName,

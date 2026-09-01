@@ -41,6 +41,22 @@ export const betterAuthUrl = isProd
         : undefined)
   : process.env.BETTER_AUTH_URL || undefined;
 
+function stripTrailingSlash(url: string): string {
+  return url.replace(/\/$/, "");
+}
+
+/**
+ * Public app origin for invite links and other emails.
+ * Prefer APP_URL so local dev can keep BETTER_AUTH_URL on localhost while
+ * emails point at the deployed site.
+ */
+export const appUrl = stripTrailingSlash(
+  process.env.APP_URL ||
+    betterAuthUrl ||
+    process.env.BETTER_AUTH_URL ||
+    "http://localhost:3000",
+);
+
 export function isAdminEmail(email: string | null | undefined): boolean {
   if (!email) return false;
   return adminEmails.has(email.trim().toLowerCase());
