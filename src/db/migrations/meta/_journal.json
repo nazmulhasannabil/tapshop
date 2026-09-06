@@ -29,6 +29,20 @@
       "when": 1788206630520,
       "tag": "0003_organic_william_stryker",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1788720893092,
+      "tag": "0004_hard_riptide",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1788722000000,
+      "tag": "0005_item_categories_table",
+      "breakpoints": true
     }
   ]
 }

@@ -16,6 +16,7 @@ import { displayedQty, useBillLineList, useBillTotals } from "@/stores/bill-stor
 import { useBill } from "@/hooks/use-bill";
 import { useSavedBill } from "@/hooks/use-saved-bills";
 import { useSession } from "@/lib/auth/client";
+import { cn } from "@/lib/utils";
 import { AnimatedTotal } from "./animated-total";
 import { EmptyState } from "./empty-state";
 
@@ -47,8 +48,8 @@ export function BillSheet({
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="bottom" className="max-h-[88dvh] gap-0 rounded-t-3xl p-0">
-        <SheetHeader className="border-b">
-          <SheetTitle className="text-center text-lg">Today&apos;s Bill</SheetTitle>
+        <SheetHeader className="border-b border-border">
+          <SheetTitle className="text-center text-lg font-bold">Today&apos;s Bill</SheetTitle>
           <SheetDescription className="text-center">
             {count > 0
               ? `${count} ${count === 1 ? "item" : "items"}`
@@ -62,7 +63,7 @@ export function BillSheet({
               icon="🧾"
               title="No bites yet"
               description="Tap an item on the home screen and watch it appear here."
-              className="mt-6 border-0"
+              className="mt-6 border-0 bg-transparent"
             />
           ) : (
             lines.map((entry) => {
@@ -70,11 +71,13 @@ export function BillSheet({
               return (
                 <div
                   key={entry.itemId}
-                  className="flex items-center gap-3 border-b border-border py-3 last:border-0"
+                  className="flex items-center gap-3 border-b border-border py-3.5 last:border-0"
                 >
-                  <span className="text-2xl leading-none">{entry.icon ?? "🍽️"}</span>
+                  <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-accent text-2xl leading-none">
+                    {entry.icon ?? "🍽️"}
+                  </span>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium">{entry.name}</p>
+                    <p className="truncate text-sm font-semibold">{entry.name}</p>
                     <p className="tnum text-xs text-muted-foreground">
                       {qty} × {formatCurrency(entry.unitPrice)} ={" "}
                       {formatCurrency(qty * entry.unitPrice)}
@@ -98,6 +101,7 @@ export function BillSheet({
                           price: entry.unitPrice,
                         })
                       }
+                      emphasize
                     >
                       <Plus className="size-4" />
                     </StepperButton>
@@ -116,7 +120,7 @@ export function BillSheet({
           )}
         </div>
 
-        <SheetFooter className="border-t">
+        <SheetFooter className="border-t border-border">
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium text-muted-foreground">Total</span>
@@ -128,7 +132,7 @@ export function BillSheet({
             <Button
               type="button"
               size="lg"
-              className="h-11 w-full text-base"
+              className="h-12 w-full rounded-xl text-base font-semibold"
               disabled={!canSave}
               onClick={handleSave}
             >
@@ -145,17 +149,24 @@ function StepperButton({
   children,
   onClick,
   label,
+  emphasize = false,
 }: {
   children: React.ReactNode;
   onClick: () => void;
   label: string;
+  emphasize?: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
       aria-label={label}
-      className="flex size-8 items-center justify-center rounded-full bg-muted text-foreground transition hover:bg-primary/10 hover:text-primary active:scale-90"
+      className={cn(
+        "flex size-8 items-center justify-center rounded-full transition active:scale-90",
+        emphasize
+          ? "bg-primary text-primary-foreground hover:bg-primary/90"
+          : "bg-muted text-foreground hover:bg-accent hover:text-primary",
+      )}
     >
       {children}
     </button>

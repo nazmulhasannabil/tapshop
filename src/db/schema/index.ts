@@ -9,6 +9,12 @@ import {
   type Account,
 } from "./auth";
 import { items, type Item } from "./items";
+import {
+  categories,
+  DEFAULT_CATEGORIES,
+  DEFAULT_CATEGORY_IDS,
+  type Category,
+} from "./categories";
 import { billEntries, type BillEntry } from "./bill-entries";
 import { activityLogs, type ActivityLog } from "./activity-logs";
 import { savedBills, type SavedBillRow } from "./saved-bills";
@@ -22,6 +28,9 @@ export {
   accounts,
   verifications,
   items,
+  categories,
+  DEFAULT_CATEGORIES,
+  DEFAULT_CATEGORY_IDS,
   billEntries,
   activityLogs,
   savedBills,
@@ -34,6 +43,7 @@ export type {
   Session,
   Account,
   Item,
+  Category,
   BillEntry,
   ActivityLog,
   SavedBillRow,
@@ -109,6 +119,12 @@ export const accountsRelations = relations(accounts, ({ one }) => ({
 export const itemsRelations = relations(items, ({ many, one }) => ({
   billEntries: many(billEntries),
   creator: one(users, { fields: [items.createdBy], references: [users.id] }),
+  category: one(categories, { fields: [items.categoryId], references: [categories.id] }),
+}));
+
+export const categoriesRelations = relations(categories, ({ many, one }) => ({
+  items: many(items),
+  creator: one(users, { fields: [categories.createdBy], references: [users.id] }),
 }));
 
 export const billEntriesRelations = relations(billEntries, ({ one }) => ({

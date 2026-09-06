@@ -30,12 +30,12 @@ export function OnboardingScreen() {
   }, [isPending, session, router]);
 
   return (
-    <div className="flex min-h-[100dvh] flex-col items-center justify-center bg-gradient-to-b from-primary/5 via-background to-background px-4 py-10">
+    <div className="flex min-h-[100dvh] flex-col items-center justify-center bg-gradient-to-b from-accent via-background to-background px-4 py-10">
       <div className="flex flex-col items-center gap-3 select-none">
-        <span className="flex size-12 items-center justify-center rounded-2xl bg-primary text-2xl text-primary-foreground shadow-sm">
+        <span className="flex size-14 items-center justify-center rounded-2xl bg-primary text-2xl text-primary-foreground shadow-md shadow-primary/25">
           🧾
         </span>
-        <span className="text-xl font-semibold tracking-tight">{APP_NAME}</span>
+        <span className="text-2xl font-bold tracking-tight text-primary">{APP_NAME}</span>
         <p className="text-sm text-muted-foreground">{APP_MOTTO}</p>
       </div>
     </div>

@@ -4,6 +4,7 @@ import { useCallback } from "react";
 import { toast } from "sonner";
 import { postJson } from "@/lib/api/client";
 import { useBillStore } from "@/stores/bill-store";
+import type { ItemCategory } from "@/lib/item-categories";
 import type {
   AddItemResult,
   ApiResult,
@@ -18,7 +19,7 @@ import type {
  * store state via the selectors in `bill-store`.
  */
 export function useBill() {
-  const addItem = useCallback(async (item: CatalogItem) => {
+  const addItem = useCallback(async (item: Pick<CatalogItem, "id" | "name" | "icon" | "price">) => {
     const store = useBillStore.getState();
     store.optimisticAdd({
       itemId: item.id,
@@ -60,7 +61,12 @@ export function useBill() {
   }, []);
 
   const createItem = useCallback(
-    async (input: { name: string; price: number; icon?: string | null }): Promise<ApiResult<CatalogItem>> => {
+    async (input: {
+      name: string;
+      price: number;
+      icon?: string | null;
+      categoryId: string;
+    }): Promise<ApiResult<CatalogItem>> => {
       const res = await postJson<CatalogItem>("/api/items", input);
       if (!res.ok) toast.error(res.error || "Couldn't create that item.");
       return res;
@@ -68,5 +74,11 @@ export function useBill() {
     [],
   );
 
-  return { addItem, decreaseItem, removeEntry, createItem };
+  const createCategory = useCallback(async (name: string): Promise<ApiResult<ItemCategory>> => {
+    const res = await postJson<ItemCategory>("/api/categories", { name });
+    if (!res.ok) toast.error(res.error || "Couldn't create that category.");
+    return res;
+  }, []);
+
+  return { addItem, decreaseItem, removeEntry, createItem, createCategory };
 }

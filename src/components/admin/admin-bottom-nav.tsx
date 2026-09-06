@@ -35,7 +35,7 @@ export function AdminBottomNav() {
   return (
     <nav
       aria-label="Admin navigation"
-      className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 backdrop-blur-md"
+      className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card shadow-[0_-4px_16px_rgba(0,0,0,0.04)]"
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
     >
       <ul className="mx-auto flex h-[var(--bottom-nav-h)] w-full max-w-md items-stretch justify-around">
@@ -56,15 +56,13 @@ export function AdminBottomNav() {
                     : "text-muted-foreground hover:text-foreground",
                 )}
               >
-                <span
-                  className={cn(
-                    "flex size-9 items-center justify-center rounded-full transition-colors",
-                    active && "bg-primary/10",
-                  )}
-                >
-                  <Icon className="size-5" />
+                <span className="relative flex size-7 items-center justify-center">
+                  <Icon
+                    className={cn("size-5 transition-colors", active && "stroke-[2.25]")}
+                    aria-hidden
+                  />
                 </span>
-                <span>{tab.label}</span>
+                <span className={cn(active && "font-semibold")}>{tab.label}</span>
               </Link>
             </li>
           );

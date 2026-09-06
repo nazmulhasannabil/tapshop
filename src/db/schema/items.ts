@@ -1,5 +1,6 @@
 import { pgTable, text, numeric, boolean, timestamp, index } from "drizzle-orm/pg-core";
 import { users } from "./auth";
+import { categories, DEFAULT_CATEGORY_IDS } from "./categories";
 
 /**
  * Shop items a user can tap.
@@ -20,6 +21,11 @@ export const items = pgTable(
     price: numeric("price", { precision: 12, scale: 2 }).notNull(),
     /** Optional emoji/short identifier for fast visual scanning. */
     icon: text("icon"),
+    /** Required category for Home filtering. */
+    categoryId: text("category_id")
+      .notNull()
+      .default(DEFAULT_CATEGORY_IDS.hangout)
+      .references(() => categories.id, { onDelete: "restrict" }),
     // Nullable so a shared item survives the deletion of its original creator.
     createdBy: text("created_by").references(() => users.id, { onDelete: "set null" }),
     isActive: boolean("is_active").notNull().default(true),
@@ -31,6 +37,7 @@ export const items = pgTable(
   (t) => [
     index("items_active_recent_idx").on(t.isActive, t.lastUsedAt),
     index("items_created_by_idx").on(t.createdBy),
+    index("items_category_id_idx").on(t.categoryId),
   ],
 );
 

@@ -1,9 +1,10 @@
 import { cache } from "react";
 import { and, asc, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { activityLogs, billEntries, items } from "@/db/schema";
+import { activityLogs, billEntries, categories, items } from "@/db/schema";
 import { ACTION, ENTITY_TYPE } from "@/db/schema";
 import { sqlAppToday } from "@/lib/timezone-sql";
+import { ensureDefaultCategories } from "@/lib/services/categories";
 import type {
   ActivityEntry,
   AddItemResult,
@@ -20,22 +21,37 @@ function toCatalogItem(row: {
   name: string;
   price: string | number;
   icon: string | null;
+  categoryId: string;
+  categoryName: string;
 }): CatalogItem {
-  return { id: row.id, name: row.name, price: num(row.price), icon: row.icon };
+  return {
+    id: row.id,
+    name: row.name,
+    price: num(row.price),
+    icon: row.icon,
+    categoryId: row.categoryId,
+    categoryName: row.categoryName,
+  };
 }
+
+const catalogSelect = {
+  id: items.id,
+  name: items.name,
+  price: items.price,
+  icon: items.icon,
+  categoryId: items.categoryId,
+  categoryName: categories.name,
+};
 
 /* --------------------------------- Reads ---------------------------------- */
 
 /** All active items, alphabetically (the "All Items" grid). */
 export const getActiveItems = cache(async function getActiveItems(): Promise<CatalogItem[]> {
+  await ensureDefaultCategories();
   const rows = await db
-    .select({
-      id: items.id,
-      name: items.name,
-      price: items.price,
-      icon: items.icon,
-    })
+    .select(catalogSelect)
     .from(items)
+    .innerJoin(categories, eq(items.categoryId, categories.id))
     .where(eq(items.isActive, true))
     .orderBy(asc(items.name));
 
@@ -71,16 +87,19 @@ export const getTodayBill = cache(async function getTodayBill(userId: string): P
 /** Items the user has consumed most recently (fast re-tap targets). */
 export async function getRecentItems(userId: string, limit = 8): Promise<CatalogItem[]> {
   const rows = await db
-    .select({
-      id: items.id,
-      name: items.name,
-      price: items.price,
-      icon: items.icon,
-    })
+    .select(catalogSelect)
     .from(billEntries)
     .innerJoin(items, eq(billEntries.itemId, items.id))
+    .innerJoin(categories, eq(items.categoryId, categories.id))
     .where(eq(billEntries.userId, userId))
-    .groupBy(items.id, items.name, items.price, items.icon)
+    .groupBy(
+      items.id,
+      items.name,
+      items.price,
+      items.icon,
+      items.categoryId,
+      categories.name,
+    )
     .orderBy(desc(sql`max(${billEntries.consumedAt})`))
     .limit(limit);
 
@@ -90,16 +109,19 @@ export async function getRecentItems(userId: string, limit = 8): Promise<Catalog
 /** Items the user consumes most often over the last 30 days ("Your Go-To's"). */
 export async function getFrequentItems(userId: string, limit = 6): Promise<CatalogItem[]> {
   const rows = await db
-    .select({
-      id: items.id,
-      name: items.name,
-      price: items.price,
-      icon: items.icon,
-    })
+    .select(catalogSelect)
     .from(billEntries)
     .innerJoin(items, eq(billEntries.itemId, items.id))
+    .innerJoin(categories, eq(items.categoryId, categories.id))
     .where(and(eq(billEntries.userId, userId), gteLast30Days()))
-    .groupBy(items.id, items.name, items.price, items.icon)
+    .groupBy(
+      items.id,
+      items.name,
+      items.price,
+      items.icon,
+      items.categoryId,
+      categories.name,
+    )
     .orderBy(desc(sql`sum(${billEntries.quantity})`))
     .limit(limit);
 
@@ -270,14 +292,25 @@ export async function removeBillEntry(userId: string, itemId: string): Promise<v
 /** Create a new item, owned by the creator. */
 export async function createItem(
   userId: string,
-  input: { name: string; price: number; icon?: string | null },
+  input: { name: string; price: number; icon?: string | null; categoryId: string },
 ): Promise<CatalogItem> {
+  const [category] = await db
+    .select({ id: categories.id, name: categories.name })
+    .from(categories)
+    .where(eq(categories.id, input.categoryId))
+    .limit(1);
+
+  if (!category) {
+    throw new BillingError("CATEGORY_NOT_FOUND", "Pick a category.");
+  }
+
   const [row] = await db
     .insert(items)
     .values({
       name: input.name,
       price: input.price.toFixed(2),
       icon: input.icon ?? null,
+      categoryId: category.id,
       createdBy: userId,
       lastUsedAt: new Date(),
     })
@@ -286,6 +319,7 @@ export async function createItem(
       name: items.name,
       price: items.price,
       icon: items.icon,
+      categoryId: items.categoryId,
     });
 
   await db.insert(activityLogs).values({
@@ -295,7 +329,7 @@ export async function createItem(
     action: ACTION.USER_CREATED_ITEM,
   });
 
-  return toCatalogItem(row);
+  return toCatalogItem({ ...row, categoryName: category.name });
 }
 
 /** Typed service error so route handlers can map to HTTP statuses cleanly. */

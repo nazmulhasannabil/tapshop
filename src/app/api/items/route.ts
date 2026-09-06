@@ -1,5 +1,5 @@
 import { createItemSchema } from "@/lib/validations/item";
-import { createItem } from "@/lib/services/billing";
+import { BillingError, createItem } from "@/lib/services/billing";
 import { getSession } from "@/lib/auth/server";
 import { fail, ok, parseJson } from "@/lib/api/http";
 
@@ -14,6 +14,11 @@ export async function POST(request: Request) {
     return fail(parsed.error.issues[0]?.message ?? "Invalid input.", 400);
   }
 
-  const item = await createItem(session.user.id, parsed.data);
-  return ok(item, 201);
+  try {
+    const item = await createItem(session.user.id, parsed.data);
+    return ok(item, 201);
+  } catch (error) {
+    if (error instanceof BillingError) return fail(error.message, 400);
+    throw error;
+  }
 }

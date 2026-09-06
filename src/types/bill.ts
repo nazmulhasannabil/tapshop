@@ -7,6 +7,10 @@ export type CatalogItem = {
   /** Current price (numbers; `items.price` is numeric in the DB). */
   price: number;
   icon: string | null;
+  /** FK to `categories.id`. */
+  categoryId: string;
+  /** Display name from the categories table. */
+  categoryName: string;
 };
 
 /** One line on today's bill. */

@@ -24,20 +24,26 @@ for (const file of [".env.local", ".env"]) {
 import { eq } from "drizzle-orm";
 import { auth } from "../lib/auth/auth";
 import { db } from "./index";
-import { items, users } from "./schema";
+import {
+  categories,
+  DEFAULT_CATEGORIES,
+  DEFAULT_CATEGORY_IDS,
+  items,
+  users,
+} from "./schema";
 
 /** Fixed id for the system user that owns seeded items. */
 const SYSTEM_USER_ID = "00000000-0000-4000-8000-000000000000";
 
 const SEED_ITEMS = [
-  { name: "Tea", price: "10", icon: "☕" },
-  { name: "Coffee", price: "25", icon: "☕" },
-  { name: "Soft Drink", price: "30", icon: "🥤" },
-  { name: "Biscuit", price: "20", icon: "🍪" },
-  { name: "Burger", price: "80", icon: "🍔" },
-  { name: "Sandwich", price: "120", icon: "🥪" },
-  { name: "Noodles", price: "60", icon: "🍜" },
-  { name: "Fries", price: "50", icon: "🍟" },
+  { name: "Tea", price: "10", icon: "☕", categoryId: DEFAULT_CATEGORY_IDS.hangout },
+  { name: "Coffee", price: "25", icon: "☕", categoryId: DEFAULT_CATEGORY_IDS.hangout },
+  { name: "Soft Drink", price: "30", icon: "🥤", categoryId: DEFAULT_CATEGORY_IDS.hangout },
+  { name: "Biscuit", price: "20", icon: "🍪", categoryId: DEFAULT_CATEGORY_IDS.hangout },
+  { name: "Burger", price: "80", icon: "🍔", categoryId: DEFAULT_CATEGORY_IDS.hangout },
+  { name: "Sandwich", price: "120", icon: "🥪", categoryId: DEFAULT_CATEGORY_IDS.hangout },
+  { name: "Noodles", price: "60", icon: "🍜", categoryId: DEFAULT_CATEGORY_IDS.hangout },
+  { name: "Fries", price: "50", icon: "🍟", categoryId: DEFAULT_CATEGORY_IDS.hangout },
 ];
 
 const DEMO_ACCOUNTS = [
@@ -59,6 +65,20 @@ async function ensureSystemUser() {
     .onConflictDoNothing();
 }
 
+async function seedCategories() {
+  await db
+    .insert(categories)
+    .values(
+      DEFAULT_CATEGORIES.map((c) => ({
+        id: c.id,
+        name: c.name,
+        createdBy: SYSTEM_USER_ID,
+      })),
+    )
+    .onConflictDoNothing();
+  console.log(`  ✅ Ensured ${DEFAULT_CATEGORIES.length} default categories.`);
+}
+
 async function seedItemsIfEmpty() {
   const existing = await db.select({ id: items.id }).from(items).limit(1);
   if (existing.length > 0) {
@@ -70,6 +90,7 @@ async function seedItemsIfEmpty() {
       name: item.name,
       price: item.price,
       icon: item.icon,
+      categoryId: item.categoryId,
       createdBy: SYSTEM_USER_ID,
     })),
   );
@@ -117,6 +138,9 @@ async function provisionAccount(account: {
 async function main() {
   console.log("→ Ensuring system user exists…");
   await ensureSystemUser();
+
+  console.log("→ Seeding categories…");
+  await seedCategories();
 
   console.log("→ Seeding items…");
   await seedItemsIfEmpty();

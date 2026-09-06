@@ -24,7 +24,7 @@ export function FilterChips({
           type="button"
           onClick={() => onChange(option)}
           className={cn(
-            "rounded-full px-4 py-1.5 text-xs font-semibold transition-colors",
+            "shrink-0 rounded-full px-4 py-1.5 text-xs font-semibold transition-colors",
             active === option
               ? "bg-primary text-primary-foreground"
               : "bg-accent text-foreground hover:bg-accent/80",

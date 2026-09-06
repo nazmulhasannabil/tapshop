@@ -2,14 +2,25 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, ReceiptText, User, HandCoins, Users } from "lucide-react";
+import {
+  Home,
+  ChartPie,
+  Banknote,
+  MessageCircleMore,
+  User,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useFriends } from "@/hooks/queries/use-friends";
 
 type Tab = {
   href: string;
   label: string;
-  icon: React.ComponentType<{ className?: string }>;
+  icon: React.ComponentType<{
+    className?: string;
+    fill?: string;
+    strokeWidth?: number;
+    "aria-hidden"?: boolean;
+  }>;
   /** Pathnames that should mark this tab active. */
   matches: string[];
   badge?: number;
@@ -20,20 +31,25 @@ const BASE_TABS: Omit<Tab, "badge">[] = [
   {
     href: "/activity",
     label: "Activity",
-    icon: ReceiptText,
+    icon: ChartPie,
     matches: ["/activity", "/stats"],
   },
   {
     href: "/debts",
     label: "Debts",
-    icon: HandCoins,
+    icon: Banknote,
     matches: ["/debts"],
   },
-  { href: "/friends", label: "Friends", icon: Users, matches: ["/friends"] },
+  {
+    href: "/friends",
+    label: "Friends",
+    icon: MessageCircleMore,
+    matches: ["/friends"],
+  },
   { href: "/profile", label: "Profile", icon: User, matches: ["/profile"] },
 ];
 
-/** Fixed bottom navigation with primary destinations. */
+/** Floating pill bottom navigation with filled active / outline inactive icons. */
 export function BottomNav({ userId }: { userId: string }) {
   const pathname = usePathname();
   const { data: friendsOverview } = useFriends(userId);
@@ -46,12 +62,21 @@ export function BottomNav({ userId }: { userId: string }) {
   return (
     <nav
       aria-label="Primary"
-      className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 backdrop-blur-md"
-      style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+      className="fixed inset-x-0 bottom-0 z-40 px-3"
+      style={{
+        paddingBottom: "max(0.5rem, env(safe-area-inset-bottom))",
+      }}
     >
-      <ul className="mx-auto flex h-[var(--bottom-nav-h)] w-full max-w-md items-stretch justify-around">
+      <ul
+        className={cn(
+          "mx-auto flex h-16 w-full max-w-md items-stretch justify-around",
+          "rounded-[1.35rem] bg-primary shadow-[0_8px_28px_rgba(0,166,81,0.35)]",
+        )}
+      >
         {tabs.map((tab) => {
-          const active = tab.matches.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+          const active = tab.matches.some(
+            (p) => pathname === p || pathname.startsWith(`${p}/`),
+          );
           const Icon = tab.icon;
           return (
             <li key={tab.href} className="flex-1">
@@ -59,24 +84,24 @@ export function BottomNav({ userId }: { userId: string }) {
                 href={tab.href}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "flex h-full flex-col items-center justify-center gap-0.5 text-[10px] font-medium transition-colors",
-                  active ? "text-primary" : "text-muted-foreground hover:text-foreground",
+                  "flex h-full flex-col items-center justify-center gap-0.5 text-[10px] font-medium text-primary-foreground transition-opacity",
+                  active ? "opacity-100" : "opacity-70 hover:opacity-100",
                 )}
               >
-                <span
-                  className={cn(
-                    "relative flex size-9 items-center justify-center rounded-full transition-colors",
-                    active && "bg-primary/10",
-                  )}
-                >
-                  <Icon className="size-5" />
+                <span className="relative flex size-7 items-center justify-center">
+                  <Icon
+                    className="size-[1.15rem] text-primary-foreground transition-[fill,stroke-width]"
+                    fill={active ? "currentColor" : "none"}
+                    strokeWidth={active ? 0 : 1.75}
+                    aria-hidden
+                  />
                   {tab.badge != null && tab.badge > 0 && (
-                    <span className="absolute -right-0.5 -top-0.5 flex size-4 items-center justify-center rounded-full bg-primary text-[9px] font-bold text-primary-foreground">
+                    <span className="absolute -right-1.5 -top-1 flex size-4 items-center justify-center rounded-full bg-primary-foreground text-[9px] font-bold text-primary">
                       {tab.badge > 9 ? "9+" : tab.badge}
                     </span>
                   )}
                 </span>
-                <span>{tab.label}</span>
+                <span className={cn(active && "font-semibold")}>{tab.label}</span>
               </Link>
             </li>
           );
