@@ -5,20 +5,21 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
-import { Button } from "@/components/ui/button";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+  AuthButton,
+  AuthCard,
+  AuthDivider,
+  AuthHeader,
+  AuthInput,
+  AuthSwitch,
+  MailIcon,
+  PasswordInput,
+  UserIcon,
+  withInvite,
+} from "@/components/auth/auth-ui";
+import { SocialLoginButtons } from "@/components/auth/social-login";
 import { authClient } from "@/lib/auth/client";
 import { registerSchema, type RegisterValues } from "@/lib/validations/auth";
 import type { ApiResult } from "@/types/bill";
@@ -36,8 +37,8 @@ function RegisterCard() {
   const searchParams = useSearchParams();
   const inviteToken = searchParams.get("invite");
   const [pending, setPending] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
   const [invite, setInvite] = useState<InvitePreview | null>(null);
+  const [emailTaken, setEmailTaken] = useState(false);
 
   const {
     register,
@@ -46,7 +47,7 @@ function RegisterCard() {
     formState: { errors },
   } = useForm<RegisterValues>({
     resolver: zodResolver(registerSchema),
-    defaultValues: { name: "", email: "", password: "" },
+    defaultValues: { name: "", email: "", password: "", confirmPassword: "" },
   });
 
   useEffect(() => {
@@ -74,10 +75,22 @@ function RegisterCard() {
 
   async function onSubmit(values: RegisterValues) {
     setPending(true);
-    const { error } = await authClient.signUp.email(values);
+    setEmailTaken(false);
+    const { error } = await authClient.signUp.email({
+      name: values.name,
+      email: values.email,
+      password: values.password,
+    });
     setPending(false);
 
     if (error) {
+      const already =
+        error.code === "USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL" || error.status === 422;
+      if (already) {
+        setEmailTaken(true);
+        toast.error("This email already has an account. Sign in instead.");
+        return;
+      }
       toast.error(error.message ?? "Couldn't create your account.");
       return;
     }
@@ -91,90 +104,86 @@ function RegisterCard() {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-xl">Create your account</CardTitle>
-        <CardDescription>
-          {invite
+    <AuthCard>
+      <AuthHeader
+        title="Create Account"
+        description={
+          invite
             ? `${invite.inviterName} invited you to track debts together.`
-            : "Takes 10 seconds. No cards, no hassle."}
-        </CardDescription>
-      </CardHeader>
-      <form onSubmit={handleSubmit(onSubmit)} className="contents">
-        <CardContent className="flex flex-col gap-4">
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="name">Name</Label>
-            <Input
-              id="name"
-              autoComplete="name"
-              placeholder="Masood"
-              aria-invalid={!!errors.name}
-              {...register("name")}
-            />
-            {errors.name && <p className="text-xs text-destructive">{errors.name.message}</p>}
-          </div>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              autoComplete="email"
-              placeholder="you@example.com"
-              aria-invalid={!!errors.email}
-              readOnly={!!invite}
-              {...register("email")}
-            />
-            {errors.email && <p className="text-xs text-destructive">{errors.email.message}</p>}
-          </div>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="password">Password</Label>
-            <div className="relative">
-              <Input
-                id="password"
-                type={showPassword ? "text" : "password"}
-                autoComplete="new-password"
-                placeholder="At least 8 characters"
-                aria-invalid={!!errors.password}
-                className="pr-9"
-                {...register("password")}
-              />
-              <button
-                type="button"
-                className="absolute top-1/2 right-2.5 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                onClick={() => setShowPassword((v) => !v)}
-                aria-label={showPassword ? "Hide password" : "Show password"}
-              >
-                {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-              </button>
-            </div>
-            {errors.password && (
-              <p className="text-xs text-destructive">{errors.password.message}</p>
-            )}
-          </div>
-        </CardContent>
-        <CardFooter className="flex flex-col items-stretch gap-3">
-          <Button type="submit" size="lg" disabled={pending} className="h-11 w-full text-base">
-            {pending && <Loader2 className="animate-spin" />}
-            {pending ? "Creating account…" : "Create account"}
-          </Button>
-          <p className="text-center text-sm text-muted-foreground">
-            Already have an account?{" "}
+            : "Create a new account to get started and enjoy seamless access to our features."
+        }
+      />
+      <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-3.5">
+        <AuthInput
+          id="name"
+          label="Name"
+          icon={UserIcon}
+          autoComplete="name"
+          error={errors.name?.message}
+          {...register("name")}
+        />
+        <AuthInput
+          id="email"
+          type="email"
+          label="Email address"
+          icon={MailIcon}
+          autoComplete="email"
+          readOnly={!!invite}
+          error={emailTaken ? undefined : errors.email?.message}
+          {...register("email", {
+            onChange: () => setEmailTaken(false),
+          })}
+        />
+        {emailTaken ? (
+          <p className="-mt-1 px-3 text-xs text-destructive">
+            This email is already registered.{" "}
             <Link
-              href={inviteToken ? `/login?invite=${encodeURIComponent(inviteToken)}` : "/login"}
-              className="font-medium text-primary hover:underline"
+              href={withInvite("/login", inviteToken)}
+              className="font-medium underline"
             >
               Sign in
-            </Link>
+            </Link>{" "}
+            with it, or use a different email.
           </p>
-        </CardFooter>
+        ) : null}
+        <PasswordInput
+          id="password"
+          label="Password"
+          autoComplete="new-password"
+          error={errors.password?.message}
+          {...register("password")}
+        />
+        <PasswordInput
+          id="confirmPassword"
+          label="Confirm Password"
+          autoComplete="new-password"
+          error={errors.confirmPassword?.message}
+          {...register("confirmPassword")}
+        />
+        <div className="pt-1">
+          <AuthButton pending={pending}>
+            {pending ? "Creating account…" : "Create Account"}
+          </AuthButton>
+        </div>
       </form>
-    </Card>
+      <div className="mt-5">
+        <AuthSwitch
+          prompt="Already have an account?"
+          action="Sign In here"
+          href={withInvite("/login", inviteToken)}
+        />
+      </div>
+      <div className="mt-6 flex flex-col gap-5">
+        <AuthDivider />
+        <SocialLoginButtons />
+      </div>
+    </AuthCard>
   );
 }
 
 export default function RegisterPage() {
   return (
-    <Suspense fallback={<Card className="h-64 animate-pulse" />}>
+    <Suspense fallback={<div className="h-96 animate-pulse rounded-[1.75rem] bg-card" />}>
       <RegisterCard />
     </Suspense>
   );

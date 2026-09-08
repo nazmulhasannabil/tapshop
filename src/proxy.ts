@@ -27,7 +27,7 @@ import {
  * Runtime is nodejs (the only runtime supported for `proxy`).
  */
 
-const AUTH_PUBLIC_PATHS = ["/login", "/register"];
+const AUTH_PUBLIC_PATHS = ["/login", "/register", "/forgot-password", "/reset-password"];
 
 function isAuthPublicPath(pathname: string) {
   return AUTH_PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));

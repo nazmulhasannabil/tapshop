@@ -36,6 +36,11 @@ export const auth = betterAuth({
     requireEmailVerification: false,
     minPasswordLength: 8,
     maxPasswordLength: 128,
+    sendResetPassword: async ({ user, url }) => {
+      // No mail transport is configured yet. Log the Better Auth reset link
+      // so local resets still work, without exposing the token to the client.
+      console.info(`[tapshop] Password reset for ${user.email}: ${url}`);
+    },
   },
 
   user: {

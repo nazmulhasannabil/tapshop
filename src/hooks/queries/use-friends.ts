@@ -14,6 +14,22 @@ export function useFriends(userId: string, initialData?: FriendsOverview) {
   });
 }
 
+export function useRequestFriend(userId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (targetUserId: string) =>
+      unwrap(
+        await postJson<{ friendshipId: string; message: string }>(
+          "/api/friends/request",
+          { userId: targetUserId },
+        ),
+      ),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.friends(userId) });
+    },
+  });
+}
+
 export function useAcceptFriend(userId: string) {
   const queryClient = useQueryClient();
   return useMutation({

@@ -1,0 +1,16 @@
+{
+  "auth": {
+    "providers": {
+      "googleSignIn": {
+        "oAuthBrandDisplayName": "TapShop",
+        "supportEmail": "nazmulhasannabil4@gmail.com",
+        "authorizedRedirectUris": [
+          "http://localhost",
+          "https://tapshop-wv29.firebaseapp.com/__/auth/handler",
+          "https://tapshop-wv29.vercel.app"
+        ]
+      }
+    },
+    "authorizedDomains": ["localhost", "tapshop-wv29.vercel.app"]
+  }
+}

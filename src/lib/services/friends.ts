@@ -1,4 +1,4 @@
-import { and, eq, ilike, or, ne, desc } from "drizzle-orm";
+import { and, eq, ilike, or, ne, desc, inArray } from "drizzle-orm";
 
 import { db } from "@/db";
 import {
@@ -46,11 +46,21 @@ export type FriendshipListItem = {
   netBalance: number;
 };
 
+/** Friend of a friend only — one mutual hop, never a third layer. */
+export type SuggestedFriend = {
+  user: FriendUser;
+  mutualCount: number;
+  mutualNames: string[];
+};
+
 export type FriendsOverview = {
   friends: FriendshipListItem[];
   pendingIncoming: FriendshipListItem[];
   pendingOutgoing: FriendshipListItem[];
+  suggestions: SuggestedFriend[];
 };
+
+const SUGGESTION_LIMIT = 20;
 
 export type InviteResult = {
   kind: "friendship" | "invite";
@@ -152,6 +162,115 @@ async function mapFriendshipRows(
   return items;
 }
 
+/**
+ * Friends of accepted friends only.
+ * Candidate -> mutual friend ids. Excludes self and anyone with any friendship row.
+ */
+async function friendOfFriendMutuals(userId: string): Promise<Map<string, string[]>> {
+  const myRows = await db
+    .select({
+      requesterId: friendships.requesterId,
+      addresseeId: friendships.addresseeId,
+      status: friendships.status,
+    })
+    .from(friendships)
+    .where(or(eq(friendships.requesterId, userId), eq(friendships.addresseeId, userId)));
+
+  const friendIds: string[] = [];
+  const relatedIds = new Set<string>([userId]);
+  for (const row of myRows) {
+    const other = otherUserId(row, userId);
+    relatedIds.add(other);
+    if (row.status === FRIENDSHIP_STATUS.ACCEPTED) friendIds.push(other);
+  }
+  if (friendIds.length === 0) return new Map();
+
+  const friendIdSet = new Set(friendIds);
+  const foafRows = await db
+    .select({
+      requesterId: friendships.requesterId,
+      addresseeId: friendships.addresseeId,
+    })
+    .from(friendships)
+    .where(
+      and(
+        eq(friendships.status, FRIENDSHIP_STATUS.ACCEPTED),
+        or(
+          inArray(friendships.requesterId, friendIds),
+          inArray(friendships.addresseeId, friendIds),
+        ),
+      ),
+    );
+
+  const mutuals = new Map<string, Set<string>>();
+  for (const row of foafRows) {
+    const reqIsFriend = friendIdSet.has(row.requesterId);
+    const addIsFriend = friendIdSet.has(row.addresseeId);
+    let mutualId: string;
+    let otherId: string;
+    if (reqIsFriend && !addIsFriend) {
+      mutualId = row.requesterId;
+      otherId = row.addresseeId;
+    } else if (addIsFriend && !reqIsFriend) {
+      mutualId = row.addresseeId;
+      otherId = row.requesterId;
+    } else {
+      continue;
+    }
+    if (relatedIds.has(otherId)) continue;
+
+    let set = mutuals.get(otherId);
+    if (!set) {
+      set = new Set();
+      mutuals.set(otherId, set);
+    }
+    set.add(mutualId);
+  }
+
+  return new Map([...mutuals.entries()].map(([id, ids]) => [id, [...ids]]));
+}
+
+/** People you may know: one hop through an accepted friend, never further. */
+export async function getPeopleYouMayKnow(userId: string): Promise<SuggestedFriend[]> {
+  const mutuals = await friendOfFriendMutuals(userId);
+  if (mutuals.size === 0) return [];
+
+  const ranked = [...mutuals.entries()]
+    .sort((a, b) => b[1].length - a[1].length)
+    .slice(0, SUGGESTION_LIMIT);
+
+  const candidateIds = ranked.map(([id]) => id);
+  const mutualIds = [...new Set(ranked.flatMap(([, ids]) => ids))];
+
+  const userRows = await db
+    .select({
+      id: users.id,
+      name: users.name,
+      email: users.email,
+      image: users.image,
+    })
+    .from(users)
+    .where(inArray(users.id, [...candidateIds, ...mutualIds]));
+
+  const byId = new Map(userRows.map((u) => [u.id, u]));
+
+  const suggestions: SuggestedFriend[] = [];
+  for (const [id, ids] of ranked) {
+    const user = byId.get(id);
+    if (!user) continue;
+    const mutualNames = ids
+      .map((mid) => byId.get(mid)?.name)
+      .filter((name): name is string => Boolean(name))
+      .slice(0, 2);
+    suggestions.push({
+      user,
+      mutualCount: ids.length,
+      mutualNames,
+    });
+  }
+  return suggestions;
+}
+
 /** Full friends overview for the Friends page. */
 export async function getFriendsOverview(userId: string): Promise<FriendsOverview> {
   const rows = await db
@@ -171,15 +290,17 @@ export async function getFriendsOverview(userId: string): Promise<FriendsOvervie
   const accepted = rows.filter((r) => r.status === FRIENDSHIP_STATUS.ACCEPTED);
   const pending = rows.filter((r) => r.status === FRIENDSHIP_STATUS.PENDING);
 
-  const [friends, pendingMapped] = await Promise.all([
+  const [friends, pendingMapped, suggestions] = await Promise.all([
     mapFriendshipRows(userId, accepted),
     mapFriendshipRows(userId, pending),
+    getPeopleYouMayKnow(userId),
   ]);
 
   return {
     friends,
     pendingIncoming: pendingMapped.filter((p) => p.direction === "incoming"),
     pendingOutgoing: pendingMapped.filter((p) => p.direction === "outgoing"),
+    suggestions,
   };
 }
 
@@ -394,6 +515,87 @@ export async function inviteFriend(
       normalized,
       mail,
       `Invite sent to ${normalized}.`,
+    ),
+  };
+}
+
+/**
+ * Send a friend request to someone you already know through one mutual friend.
+ * Refuses strangers and anyone beyond two layers.
+ */
+export async function requestFriendship(
+  userId: string,
+  targetUserId: string,
+): Promise<{ friendshipId: string; message: string }> {
+  if (userId === targetUserId) {
+    throw new Error("You can't add yourself.");
+  }
+
+  const mutuals = await friendOfFriendMutuals(userId);
+  if (!mutuals.has(targetUserId)) {
+    throw new Error("You can only add friends of your friends.");
+  }
+
+  const [me, target] = await Promise.all([
+    db
+      .select({ name: users.name })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1),
+    db
+      .select({ id: users.id, name: users.name, email: users.email })
+      .from(users)
+      .where(eq(users.id, targetUserId))
+      .limit(1),
+  ]);
+
+  if (!target[0]) throw new Error("Person not found.");
+
+  const pair = await findExistingPair(userId, targetUserId);
+  if (pair) {
+    if (pair.status === FRIENDSHIP_STATUS.ACCEPTED) {
+      throw new Error("You're already friends.");
+    }
+    if (pair.status === FRIENDSHIP_STATUS.PENDING) {
+      throw new Error("A friend request is already pending.");
+    }
+    await db
+      .update(friendships)
+      .set({
+        requesterId: userId,
+        addresseeId: targetUserId,
+        status: FRIENDSHIP_STATUS.PENDING,
+        updatedAt: new Date(),
+      })
+      .where(eq(friendships.id, pair.id));
+  }
+
+  const friendshipId = pair
+    ? pair.id
+    : (
+        await db
+          .insert(friendships)
+          .values({
+            requesterId: userId,
+            addresseeId: targetUserId,
+            status: FRIENDSHIP_STATUS.PENDING,
+          })
+          .returning()
+      )[0].id;
+
+  const friendsUrl = `${appUrl}/friends`;
+  const mail = await sendFriendInviteEmail({
+    to: target[0].email,
+    inviterName: me[0]?.name ?? "Someone",
+    inviteUrl: friendsUrl,
+  });
+
+  return {
+    friendshipId,
+    message: inviteEmailMessage(
+      target[0].name,
+      mail,
+      `Friend request sent to ${target[0].name}.`,
     ),
   };
 }

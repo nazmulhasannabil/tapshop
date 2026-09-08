@@ -5,20 +5,20 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
-import { Button } from "@/components/ui/button";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+  AuthButton,
+  AuthCard,
+  AuthDivider,
+  AuthHeader,
+  AuthInput,
+  AuthSwitch,
+  MailIcon,
+  PasswordInput,
+  withInvite,
+} from "@/components/auth/auth-ui";
+import { SocialLoginButtons } from "@/components/auth/social-login";
 import { authClient } from "@/lib/auth/client";
 import { loginSchema, type LoginValues } from "@/lib/validations/auth";
 import type { ApiResult } from "@/types/bill";
@@ -34,7 +34,7 @@ function LoginCard() {
   const searchParams = useSearchParams();
   const inviteToken = searchParams.get("invite");
   const [pending, setPending] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
   const [invite, setInvite] = useState<InvitePreview | null>(null);
 
   const {
@@ -68,7 +68,7 @@ function LoginCard() {
 
   async function onSubmit(values: LoginValues) {
     setPending(true);
-    const { error } = await authClient.signIn.email(values);
+    const { error } = await authClient.signIn.email({ ...values, rememberMe });
     setPending(false);
 
     if (error) {
@@ -86,78 +86,69 @@ function LoginCard() {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-xl">Welcome back 👋</CardTitle>
-        <CardDescription>
-          {invite
+    <AuthCard>
+      <AuthHeader
+        title="Log in"
+        description={
+          invite
             ? `${invite.inviterName} invited you — sign in to accept.`
-            : "Sign in to keep your shop bill in check."}
-        </CardDescription>
-      </CardHeader>
-      <form onSubmit={handleSubmit(onSubmit)} className="contents">
-        <CardContent className="flex flex-col gap-4">
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              autoComplete="email"
-              placeholder="you@example.com"
-              aria-invalid={!!errors.email}
-              {...register("email")}
+            : "Enter your email and password to securely access your account and manage your services."
+        }
+      />
+      <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-3.5">
+        <AuthInput
+          id="email"
+          type="email"
+          label="Email address"
+          icon={MailIcon}
+          autoComplete="email"
+          error={errors.email?.message}
+          {...register("email")}
+        />
+        <PasswordInput
+          id="password"
+          label="Password"
+          autoComplete="current-password"
+          error={errors.password?.message}
+          {...register("password")}
+        />
+        <div className="flex items-center justify-between px-1 pt-0.5">
+          <label className="flex items-center gap-2 text-xs text-muted-foreground">
+            <input
+              type="checkbox"
+              checked={rememberMe}
+              onChange={(event) => setRememberMe(event.target.checked)}
+              className="size-3.5 rounded-sm border-border accent-primary"
             />
-            {errors.email && <p className="text-xs text-destructive">{errors.email.message}</p>}
-          </div>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="password">Password</Label>
-            <div className="relative">
-              <Input
-                id="password"
-                type={showPassword ? "text" : "password"}
-                autoComplete="current-password"
-                placeholder="••••••••"
-                aria-invalid={!!errors.password}
-                className="pr-9"
-                {...register("password")}
-              />
-              <button
-                type="button"
-                className="absolute top-1/2 right-2.5 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                onClick={() => setShowPassword((v) => !v)}
-                aria-label={showPassword ? "Hide password" : "Show password"}
-              >
-                {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-              </button>
-            </div>
-            {errors.password && (
-              <p className="text-xs text-destructive">{errors.password.message}</p>
-            )}
-          </div>
-        </CardContent>
-        <CardFooter className="flex flex-col items-stretch gap-3">
-          <Button type="submit" size="lg" disabled={pending} className="h-11 w-full text-base">
-            {pending && <Loader2 className="animate-spin" />}
-            {pending ? "Signing in…" : "Sign in"}
-          </Button>
-          <p className="text-center text-sm text-muted-foreground">
-            New here?{" "}
-            <Link
-              href={inviteToken ? `/register?invite=${encodeURIComponent(inviteToken)}` : "/register"}
-              className="font-medium text-primary hover:underline"
-            >
-              Create an account
-            </Link>
-          </p>
-        </CardFooter>
+            Remember me
+          </label>
+          <Link
+            href="/forgot-password"
+            className="text-xs font-medium text-primary hover:underline"
+          >
+            Forgot Password
+          </Link>
+        </div>
+        <AuthButton pending={pending}>{pending ? "Signing in…" : "Login"}</AuthButton>
       </form>
-    </Card>
+      <div className="mt-5">
+        <AuthSwitch
+          prompt="Don't have an account?"
+          action="Sign Up here"
+          href={withInvite("/register", inviteToken)}
+        />
+      </div>
+      <div className="mt-6 flex flex-col gap-5">
+        <AuthDivider />
+        <SocialLoginButtons />
+      </div>
+    </AuthCard>
   );
 }
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={<Card className="h-64 animate-pulse" />}>
+    <Suspense fallback={<div className="h-96 animate-pulse rounded-[1.75rem] bg-card" />}>
       <LoginCard />
     </Suspense>
   );

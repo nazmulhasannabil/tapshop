@@ -15,6 +15,11 @@ export const friendshipIdSchema = z.object({
 });
 export type FriendshipIdInput = z.infer<typeof friendshipIdSchema>;
 
+export const requestFriendSchema = z.object({
+  userId: z.string().min(1, "Missing user id."),
+});
+export type RequestFriendInput = z.infer<typeof requestFriendSchema>;
+
 export const claimInviteSchema = z.object({
   token: z.string().min(1, "Missing invite token."),
 });
