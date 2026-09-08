@@ -14,7 +14,7 @@ export default async function UserLayout({ children }: { children: ReactNode }) 
   return (
     <QueryProvider>
       {children}
-      <BottomNav userId={session.user.id} />
+      <BottomNav userId={session.user.id} avatarUrl={session.user.image} />
     </QueryProvider>
   );
 }

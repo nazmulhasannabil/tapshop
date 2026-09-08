@@ -13,14 +13,9 @@ export function ActivityScreen({ children }: { children: ReactNode }) {
         <StatsOverview />
 
         <div className="space-y-6">
-          <div className="space-y-1">
-            <h2 className="text-2xl font-bold tracking-tight text-foreground">
-              Saved Bills
-            </h2>
-            <p className="text-sm text-muted-foreground">
-              Snapshots of the bills you&apos;ve saved.
-            </p>
-          </div>
+          <h2 className="text-2xl font-bold tracking-tight text-foreground">
+            Saved Bills
+          </h2>
 
           {children}
         </div>

@@ -95,7 +95,6 @@ export function BillingScreen({
             items={recentItems}
             onItemTap={bumpRecent}
             onClear={() => setRecentItems([])}
-            onAdd={() => setAddOpen(true)}
           />
         )}
 
@@ -162,7 +161,7 @@ export function BillingScreenSkeleton() {
       <Skeleton className="h-40 w-full rounded-none bg-primary/80" />
       <div className="space-y-8 px-4 pt-6">
         <Skeleton className="h-4 w-28" />
-        <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-3">
+        <div className="grid grid-cols-4 gap-2.5">
           {Array.from({ length: 6 }).map((_, i) => (
             <Skeleton key={i} className="min-h-[168px] rounded-2xl" />
           ))}

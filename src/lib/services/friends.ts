@@ -1,4 +1,6 @@
-import { and, eq, ilike, or, ne, desc, inArray } from "drizzle-orm";
+import { and, count, eq, ilike, or, ne, desc, inArray, lt } from "drizzle-orm";
+
+import { FRIENDS_PAGE_SIZE, FRIENDS_PAGE_SIZE_MAX } from "@/lib/constants";
 
 import { db } from "@/db";
 import {
@@ -17,6 +19,7 @@ import {
   sendFriendInviteEmail,
 } from "@/lib/email/invite-email";
 import { appUrl } from "@/lib/config/env";
+import { gravatarUrl } from "@/lib/gravatar";
 
 const INVITE_TTL_MS = 14 * 24 * 60 * 60 * 1000;
 
@@ -60,6 +63,28 @@ export type FriendsOverview = {
   suggestions: SuggestedFriend[];
 };
 
+export type FriendsListKind = "friends" | "requests" | "suggestions";
+
+export type FriendTabCounts = {
+  friends: number;
+  requests: number;
+  suggestions: number;
+  /** Incoming pending only — bottom-nav badge. */
+  pendingIncoming: number;
+};
+
+export type FriendsListPage = {
+  list: FriendsListKind;
+  items: Array<FriendshipListItem | SuggestedFriend>;
+  nextCursor: string | null;
+  counts: FriendTabCounts;
+};
+
+export function clampFriendsPageSize(limit: number | undefined): number {
+  if (limit == null || !Number.isFinite(limit) || limit < 1) return FRIENDS_PAGE_SIZE;
+  return Math.min(Math.floor(limit), FRIENDS_PAGE_SIZE_MAX);
+}
+
 const SUGGESTION_LIMIT = 20;
 
 export type InviteResult = {
@@ -79,6 +104,22 @@ export type InvitePreview = {
   expired: boolean;
   status: string;
 };
+
+/** Same resolution as the profile screen: uploaded photo, else Gravatar. */
+function asFriendUser(row: {
+  id: string;
+  name: string;
+  email: string;
+  image: string | null;
+}): FriendUser {
+  const uploaded = row.image?.trim();
+  return {
+    id: row.id,
+    name: row.name,
+    email: row.email,
+    image: uploaded ? uploaded : gravatarUrl(row.email, 128),
+  };
+}
 
 function otherUserId(row: { requesterId: string; addresseeId: string }, me: string) {
   return row.requesterId === me ? row.addresseeId : row.requesterId;
@@ -155,7 +196,7 @@ async function mapFriendshipRows(
       friendshipId: row.id,
       status: row.status,
       direction: row.addresseeId === me ? "incoming" : "outgoing",
-      user: u,
+      user: asFriendUser(u),
       netBalance,
     });
   }
@@ -263,12 +304,169 @@ export async function getPeopleYouMayKnow(userId: string): Promise<SuggestedFrie
       .filter((name): name is string => Boolean(name))
       .slice(0, 2);
     suggestions.push({
-      user,
+      user: asFriendUser(user),
       mutualCount: ids.length,
       mutualNames,
     });
   }
   return suggestions;
+}
+
+function encodeFriendCursor(updatedAt: Date, id: string) {
+  return `${updatedAt.toISOString()}|${id}`;
+}
+
+export function decodeFriendCursor(cursor: string): { updatedAt: Date; id: string } | null {
+  const idx = cursor.lastIndexOf("|");
+  if (idx <= 0) return null;
+  const updatedAt = new Date(cursor.slice(0, idx));
+  const id = cursor.slice(idx + 1);
+  if (!id || Number.isNaN(updatedAt.getTime())) return null;
+  return { updatedAt, id };
+}
+
+function involvedWith(userId: string) {
+  return or(eq(friendships.requesterId, userId), eq(friendships.addresseeId, userId));
+}
+
+async function countFriendships(
+  userId: string,
+  status: string,
+  direction?: "incoming" | "outgoing",
+): Promise<number> {
+  const side =
+    direction === "incoming"
+      ? eq(friendships.addresseeId, userId)
+      : direction === "outgoing"
+        ? eq(friendships.requesterId, userId)
+        : involvedWith(userId);
+
+  const [row] = await db
+    .select({ value: count() })
+    .from(friendships)
+    .where(and(side, eq(friendships.status, status)));
+  return Number(row?.value ?? 0);
+}
+
+/** Capsule badges and the nav badge. Does not load list rows. */
+export async function getFriendTabCounts(userId: string): Promise<FriendTabCounts> {
+  const [friends, pendingIncoming, pendingOutgoing, mutuals] = await Promise.all([
+    countFriendships(userId, FRIENDSHIP_STATUS.ACCEPTED),
+    countFriendships(userId, FRIENDSHIP_STATUS.PENDING, "incoming"),
+    countFriendships(userId, FRIENDSHIP_STATUS.PENDING, "outgoing"),
+    friendOfFriendMutuals(userId),
+  ]);
+  return {
+    friends,
+    requests: pendingIncoming + pendingOutgoing,
+    suggestions: mutuals.size,
+    pendingIncoming,
+  };
+}
+
+async function pageFriendships(
+  userId: string,
+  status: string,
+  cursor: string | null,
+  limit: number,
+): Promise<{ items: FriendshipListItem[]; nextCursor: string | null }> {
+  const decoded = cursor ? decodeFriendCursor(cursor) : null;
+  const conditions = [involvedWith(userId), eq(friendships.status, status)];
+  if (decoded) {
+    conditions.push(
+      or(
+        lt(friendships.updatedAt, decoded.updatedAt),
+        and(eq(friendships.updatedAt, decoded.updatedAt), lt(friendships.id, decoded.id)),
+      )!,
+    );
+  }
+
+  const rows = await db
+    .select()
+    .from(friendships)
+    .where(and(...conditions))
+    .orderBy(desc(friendships.updatedAt), desc(friendships.id))
+    .limit(limit + 1);
+
+  const hasMore = rows.length > limit;
+  const pageRows = hasMore ? rows.slice(0, limit) : rows;
+  const items = await mapFriendshipRows(userId, pageRows);
+  const last = pageRows[pageRows.length - 1];
+  return {
+    items,
+    nextCursor: hasMore && last ? encodeFriendCursor(last.updatedAt, last.id) : null,
+  };
+}
+
+async function pageSuggestions(
+  userId: string,
+  cursor: string | null,
+  limit: number,
+): Promise<{ items: SuggestedFriend[]; nextCursor: string | null }> {
+  const offset = cursor ? Number.parseInt(cursor, 10) : 0;
+  const safeOffset = Number.isFinite(offset) && offset >= 0 ? offset : 0;
+
+  const mutuals = await friendOfFriendMutuals(userId);
+  const ranked = [...mutuals.entries()].sort(
+    (a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0]),
+  );
+  const slice = ranked.slice(safeOffset, safeOffset + limit);
+  if (slice.length === 0) return { items: [], nextCursor: null };
+
+  const candidateIds = slice.map(([id]) => id);
+  const mutualIds = [...new Set(slice.flatMap(([, ids]) => ids))];
+  const userRows = await db
+    .select({
+      id: users.id,
+      name: users.name,
+      email: users.email,
+      image: users.image,
+    })
+    .from(users)
+    .where(inArray(users.id, [...candidateIds, ...mutualIds]));
+
+  const byId = new Map(userRows.map((u) => [u.id, u]));
+  const items: SuggestedFriend[] = [];
+  for (const [id, ids] of slice) {
+    const user = byId.get(id);
+    if (!user) continue;
+    const mutualNames = ids
+      .map((mid) => byId.get(mid)?.name)
+      .filter((name): name is string => Boolean(name))
+      .slice(0, 2);
+    items.push({ user: asFriendUser(user), mutualCount: ids.length, mutualNames });
+  }
+
+  const nextOffset = safeOffset + limit;
+  return {
+    items,
+    nextCursor: nextOffset < ranked.length ? String(nextOffset) : null,
+  };
+}
+
+/** One page of a friends tab. `limit` is clamped to 1–15. */
+export async function getFriendsListPage(
+  userId: string,
+  list: FriendsListKind,
+  cursor: string | null,
+  limit: number = FRIENDS_PAGE_SIZE,
+): Promise<FriendsListPage> {
+  const size = clampFriendsPageSize(limit);
+  const [page, counts] = await Promise.all([
+    list === "friends"
+      ? pageFriendships(userId, FRIENDSHIP_STATUS.ACCEPTED, cursor, size)
+      : list === "requests"
+        ? pageFriendships(userId, FRIENDSHIP_STATUS.PENDING, cursor, size)
+        : pageSuggestions(userId, cursor, size),
+    getFriendTabCounts(userId),
+  ]);
+
+  return {
+    list,
+    items: page.items,
+    nextCursor: page.nextCursor,
+    counts,
+  };
 }
 
 /** Full friends overview for the Friends page. */
@@ -335,7 +533,7 @@ export async function searchFriends(userId: string, q: string): Promise<FriendUs
     )
     .limit(20);
 
-  return rows;
+  return rows.map(asFriendUser);
 }
 
 /** Public preview for register/login invite pages. */
@@ -770,5 +968,5 @@ export async function getAcceptedFriend(
     .from(users)
     .where(eq(users.id, friendId))
     .limit(1);
-  return rows[0] ?? null;
+  return rows[0] ? asFriendUser(rows[0]) : null;
 }

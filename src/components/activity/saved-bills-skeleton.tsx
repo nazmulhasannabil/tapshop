@@ -8,7 +8,7 @@ export function SavedBillsSkeleton() {
         <Skeleton className="h-8 w-40" />
         <Skeleton className="h-4 w-56" />
       </div>
-      <Skeleton className="h-64 w-full rounded-2xl" />
+      <Skeleton className="h-64 w-full" />
     </div>
   );
 }

@@ -8,19 +8,21 @@ import { toast } from "sonner";
 import { FriendsScreen } from "@/components/friends/friends-screen";
 import { postJson, unwrap } from "@/lib/api/client";
 import { queryKeys } from "@/lib/query/keys";
-import type { FriendsOverview } from "@/lib/services/friends";
+import type { FriendsListKind, FriendsListPage } from "@/lib/services/friends";
 
 /**
  * Claims an invite token once after login/register, then shows Friends.
  */
 export function FriendsPageClient({
   userId,
-  initial,
+  initialList,
+  initialPage,
   inviteToken,
   highlightFriendshipId,
 }: {
   userId: string;
-  initial: FriendsOverview;
+  initialList: FriendsListKind;
+  initialPage: FriendsListPage;
   inviteToken?: string | null;
   highlightFriendshipId?: string | null;
 }) {
@@ -53,7 +55,8 @@ export function FriendsPageClient({
   return (
     <FriendsScreen
       userId={userId}
-      initial={initial}
+      initialList={initialList}
+      initialPage={initialPage}
       highlightFriendshipId={highlightFriendshipId}
     />
   );

@@ -18,6 +18,10 @@ export const DEFAULT_DAILY_TARGET = 500;
 /** Rows per page on the Activity saved-bills table. */
 export const SAVED_BILLS_PAGE_SIZE = 10;
 
+/** Friends lists load this many cards, then more on scroll. Never more than the max. */
+export const FRIENDS_PAGE_SIZE = 12;
+export const FRIENDS_PAGE_SIZE_MAX = 15;
+
 /**
  * Format an amount as Bangladeshi Taka with the ৳ symbol.
  * Uses manual symbol prefix + locale grouping so it renders consistently

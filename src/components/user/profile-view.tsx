@@ -213,7 +213,7 @@ export function ProfileView({
               aria-label="Change profile picture"
               disabled={uploading}
               onClick={() => fileInputRef.current?.click()}
-              className="absolute bottom-1 right-1 flex size-8 items-center justify-center rounded-full bg-card shadow-sm ring-1 ring-foreground/10 transition hover:bg-muted active:scale-90 disabled:opacity-60"
+              className="absolute bottom-1 right-1 flex size-8 items-center justify-center rounded-full bg-card transition hover:bg-muted active:scale-90 disabled:opacity-60"
             >
               {uploading ? (
                 <Loader2 className="size-4 animate-spin text-primary" />
@@ -236,7 +236,7 @@ export function ProfileView({
         </section>
 
         {/* Total consumption */}
-        <section className="rounded-3xl bg-card p-5 shadow-sm ring-1 ring-foreground/5">
+        <section>
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             Total Consumption
           </p>
@@ -247,7 +247,7 @@ export function ProfileView({
 
         {/* Summary grid */}
         <section className="grid grid-cols-2 gap-3">
-          <div className="rounded-2xl bg-card p-4 shadow-sm ring-1 ring-foreground/5">
+          <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Favorite Item
             </p>
@@ -260,7 +260,7 @@ export function ProfileView({
               </span>
             </div>
           </div>
-          <div className="rounded-2xl bg-card p-4 shadow-sm ring-1 ring-foreground/5">
+          <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Member Since
             </p>
@@ -272,11 +272,11 @@ export function ProfileView({
 
         {/* Account settings */}
         <section className="space-y-3">
-          <h3 className="px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             Account Settings
           </h3>
-          <div className="overflow-hidden rounded-3xl bg-card shadow-sm ring-1 ring-foreground/5">
-            <div className="divide-y divide-border">
+          <div>
+            <div>
               <SettingsRowButton
                 row={{ icon: Users, label: "Friends" }}
                 onClick={() => router.push("/friends")}
@@ -294,11 +294,11 @@ export function ProfileView({
 
         {/* App settings */}
         <section className="space-y-3">
-          <h3 className="px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             App Settings
           </h3>
-          <div className="overflow-hidden rounded-3xl bg-card shadow-sm ring-1 ring-foreground/5">
-            <div className="divide-y divide-border">
+          <div>
+            <div>
               <SettingsRowButton
                 row={{
                   icon: Palette,
@@ -554,14 +554,14 @@ function SettingsRowButton({
     <button
       type="button"
       onClick={onClick}
-      className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition hover:bg-muted/50 active:bg-muted"
+      className="flex w-full items-center gap-3 py-3.5 text-left transition hover:bg-muted/50 active:bg-muted"
     >
-      <span className="flex size-9 items-center justify-center rounded-full bg-primary/10 text-primary">
+      <span className="flex size-9 items-center justify-center bg-primary/10 text-primary">
         <Icon className="size-5" />
       </span>
       <span className="flex-1 font-medium text-foreground">{row.label}</span>
       {row.comingSoon ? (
-        <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+        <span className="bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
           Coming soon
         </span>
       ) : (

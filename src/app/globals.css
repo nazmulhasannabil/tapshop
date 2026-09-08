@@ -67,8 +67,8 @@
   /* Pill height + float gap for the bottom navigation (used for offset/spacing). */
   --bottom-nav-h: 4.5rem;
 
-  /* Background: very light mint (#F5FBF7) */
-  --background: oklch(0.985 0.008 155);
+  /* Background: white */
+  --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.145 0 0);

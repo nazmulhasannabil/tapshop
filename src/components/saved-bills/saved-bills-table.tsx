@@ -25,7 +25,7 @@ export function SavedBillsTable({
 
   return (
     <div className="space-y-4">
-      <div className="overflow-hidden rounded-2xl ring-1 ring-foreground/5">
+      <div className="overflow-hidden">
         <table className="w-full border-collapse text-sm">
           <thead>
             <tr className="bg-muted/50 text-left text-xs uppercase tracking-wide text-muted-foreground">
@@ -53,7 +53,7 @@ export function SavedBillsTable({
                     onSelect(bill);
                   }
                 }}
-                className="cursor-pointer border-t border-border bg-card transition hover:bg-muted/40"
+                className="cursor-pointer bg-card transition hover:bg-muted/40"
               >
                 <td className="px-4 py-3">
                   <p className="font-medium text-foreground">{formatBillDate(bill.billDate)}</p>
@@ -110,13 +110,13 @@ function Pagination({
           <Link
             href={pageHref(current - 1)}
             aria-label="Previous page"
-            className={buttonVariants({ variant: "outline", size: "sm" })}
+            className={buttonVariants({ variant: "default", size: "sm" })}
           >
             <ChevronLeft className="size-4" />
             Prev
           </Link>
         ) : (
-          <Button variant="outline" size="sm" disabled aria-disabled="true">
+          <Button variant="default" size="sm" disabled aria-disabled="true">
             <ChevronLeft className="size-4" />
             Prev
           </Button>
@@ -125,13 +125,13 @@ function Pagination({
           <Link
             href={pageHref(current + 1)}
             aria-label="Next page"
-            className={buttonVariants({ variant: "outline", size: "sm" })}
+            className={buttonVariants({ variant: "default", size: "sm" })}
           >
             Next
             <ChevronRight className="size-4" />
           </Link>
         ) : (
-          <Button variant="outline" size="sm" disabled aria-disabled="true">
+          <Button variant="default" size="sm" disabled aria-disabled="true">
             Next
             <ChevronRight className="size-4" />
           </Button>

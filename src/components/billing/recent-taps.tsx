@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, Plus } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import { motion } from "motion/react";
 import { formatCurrency } from "@/lib/constants";
 import { displayedQty, useBillEntry } from "@/stores/bill-store";
@@ -8,24 +8,22 @@ import { useBill } from "@/hooks/use-bill";
 import type { CatalogItem } from "@/types/bill";
 
 /**
- * White card with recent-tap chips, Clear All, and a trailing + to add an item.
+ * White card with recent-tap chips and Clear All.
  * Tapping a chip still adds one and bubbles it to the front via `onItemTap`.
  */
 export function RecentTaps({
   items,
   onItemTap,
   onClear,
-  onAdd,
 }: {
   items: CatalogItem[];
   onItemTap?: (item: CatalogItem) => void;
   onClear?: () => void;
-  onAdd?: () => void;
 }) {
   if (items.length === 0) return null;
 
   return (
-    <section className="rounded-2xl bg-card p-4 shadow-sm ring-1 ring-border/60">
+    <section className="rounded-2xl bg-card text-left">
       <div className="flex items-center justify-between">
         <button
           type="button"
@@ -47,26 +45,10 @@ export function RecentTaps({
         </button>
       </div>
 
-      <div className="mt-3 flex items-center gap-2.5">
-        <div className="no-scrollbar flex min-w-0 flex-1 gap-2.5 overflow-x-auto">
-          {items.map((item) => (
-            <RecentChip key={item.id} item={item} onTap={onItemTap} />
-          ))}
-        </div>
-
-        <div
-          aria-hidden
-          className="h-10 w-px shrink-0 self-center bg-border"
-        />
-
-        <button
-          type="button"
-          onClick={onAdd}
-          aria-label="Add new item"
-          className="flex size-11 shrink-0 items-center justify-center rounded-full bg-accent text-primary transition hover:bg-accent/80 active:scale-95"
-        >
-          <Plus className="size-5" strokeWidth={2.5} />
-        </button>
+      <div className="no-scrollbar flex justify-start gap-2.5 overflow-x-auto">
+        {items.map((item) => (
+          <RecentChip key={item.id} item={item} onTap={onItemTap} />
+        ))}
       </div>
     </section>
   );
@@ -103,12 +85,12 @@ function RecentChip({
       onKeyDown={handleKeyDown}
       whileTap={{ scale: 0.95 }}
       transition={{ type: "spring", stiffness: 500, damping: 30 }}
-      className="group flex shrink-0 items-center gap-2 rounded-2xl bg-accent py-1.5 pl-1.5 pr-2.5 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring"
+      className="group flex shrink-0 items-center gap-2 rounded-2xl py-1.5 pr-2.5 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring"
     >
       <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-card text-lg leading-none shadow-sm ring-1 ring-border/50">
         {item.icon ?? "🍽️"}
       </span>
-      <span className="flex min-w-0 flex-col leading-tight">
+      <span className="flex min-w-0 flex-col items-start text-left leading-tight">
         <span className="truncate text-sm font-semibold text-foreground">
           {item.name}
         </span>

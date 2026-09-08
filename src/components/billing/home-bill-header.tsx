@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { Bell, CheckCheck, LayoutDashboard, ArrowRight } from "lucide-react";
@@ -9,6 +10,7 @@ import { cn } from "@/lib/utils";
 import {
   useNotificationState,
   useNotificationStore,
+  type Notification,
 } from "@/stores/notification-store";
 import { AnimatedTotal } from "@/components/billing/animated-total";
 
@@ -99,80 +101,18 @@ export function HomeBillHeader({
               )}
             </button>
 
-            {open && (
-              <>
-                <button
-                  type="button"
-                  aria-label="Close notifications"
-                  tabIndex={-1}
-                  onClick={() => setOpen(false)}
-                  className="fixed inset-0 z-40 cursor-default"
-                />
-
-                <div
-                  role="dialog"
-                  aria-label="Notifications"
-                  className="absolute right-0 top-full z-50 mt-2 w-80 max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl bg-card text-card-foreground shadow-xl ring-1 ring-foreground/5"
-                >
-                  <div className="flex items-center justify-between border-b border-border/60 px-4 py-3">
-                    <h2 className="text-sm font-bold text-foreground">
-                      Notifications
-                    </h2>
-                    {unreadCount > 0 && (
-                      <button
-                        type="button"
-                        onClick={markAllRead}
-                        className="flex items-center gap-1 text-xs font-semibold text-primary transition hover:opacity-80"
-                      >
-                        <CheckCheck className="size-3.5" />
-                        Mark all read
-                      </button>
-                    )}
-                  </div>
-
-                  <ul className="max-h-[60vh] divide-y divide-border/60 overflow-y-auto">
-                    {notifications.map((n) => {
-                      const isUnread = !readIds.has(n.id);
-                      return (
-                        <li
-                          key={n.id}
-                          className={cn(
-                            "flex gap-3 px-4 py-3 transition",
-                            isUnread ? "bg-primary/5" : "bg-card",
-                          )}
-                        >
-                          <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-lg">
-                            {n.icon}
-                          </span>
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-2">
-                              <p className="truncate text-sm font-semibold text-foreground">
-                                {n.title}
-                              </p>
-                              {isUnread && (
-                                <span className="size-2 shrink-0 rounded-full bg-primary" />
-                              )}
-                            </div>
-                            <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
-                              {n.body}
-                            </p>
-                            <p className="mt-1 text-[11px] text-muted-foreground/80">
-                              {n.time}
-                            </p>
-                          </div>
-                        </li>
-                      );
-                    })}
-                  </ul>
-
-                  {notifications.length === 0 && (
-                    <div className="px-4 py-10 text-center text-sm text-muted-foreground">
-                      No notifications yet.
-                    </div>
-                  )}
-                </div>
-              </>
-            )}
+            {open &&
+              createPortal(
+                <NotificationMenu
+                  anchor={bellRef.current}
+                  notifications={notifications}
+                  readIds={readIds}
+                  unreadCount={unreadCount}
+                  onClose={() => setOpen(false)}
+                  onMarkAllRead={markAllRead}
+                />,
+                document.body,
+              )}
           </div>
         </div>
 
@@ -226,5 +166,107 @@ export function HomeBillHeader({
         </section>
       </div>
     </header>
+  );
+}
+
+function NotificationMenu({
+  anchor,
+  notifications,
+  readIds,
+  unreadCount,
+  onClose,
+  onMarkAllRead,
+}: {
+  anchor: HTMLButtonElement | null;
+  notifications: Notification[];
+  readIds: Set<string>;
+  unreadCount: number;
+  onClose: () => void;
+  onMarkAllRead: () => void;
+}) {
+  const [pos, setPos] = useState({ top: 0, right: 16 });
+
+  useEffect(() => {
+    function place() {
+      if (!anchor) return;
+      const rect = anchor.getBoundingClientRect();
+      setPos({
+        top: rect.bottom + 8,
+        right: Math.max(16, window.innerWidth - rect.right),
+      });
+    }
+
+    place();
+    window.addEventListener("resize", place);
+    window.addEventListener("scroll", place, true);
+    return () => {
+      window.removeEventListener("resize", place);
+      window.removeEventListener("scroll", place, true);
+    };
+  }, [anchor]);
+
+  return (
+    <>
+      <button
+        type="button"
+        aria-label="Close notifications"
+        tabIndex={-1}
+        onClick={onClose}
+        className="fixed inset-0 z-[70] cursor-default"
+      />
+      <div
+        role="dialog"
+        aria-label="Notifications"
+        className="fixed z-[80] w-80 max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl bg-card text-card-foreground shadow-xl ring-1 ring-foreground/5"
+        style={{ top: pos.top, right: pos.right }}
+      >
+        <div className="flex items-center justify-between border-b border-border/60 px-4 py-3">
+          <h2 className="text-sm font-bold text-foreground">Notifications</h2>
+          {unreadCount > 0 && (
+            <button
+              type="button"
+              onClick={onMarkAllRead}
+              className="flex items-center gap-1 text-xs font-semibold text-primary transition hover:opacity-80"
+            >
+              <CheckCheck className="size-3.5" />
+              Mark all read
+            </button>
+          )}
+        </div>
+
+        <ul className="max-h-[min(60vh,24rem)] divide-y divide-border/60 overflow-y-auto">
+          {notifications.map((n) => {
+            const isUnread = !readIds.has(n.id);
+            return (
+              <li
+                key={n.id}
+                className={cn(
+                  "flex gap-3 px-4 py-3 transition",
+                  isUnread ? "bg-primary/5" : "bg-card",
+                )}
+              >
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-lg">
+                  {n.icon}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <p className="truncate text-sm font-semibold text-foreground">{n.title}</p>
+                    {isUnread && <span className="size-2 shrink-0 rounded-full bg-primary" />}
+                  </div>
+                  <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{n.body}</p>
+                  <p className="mt-1 text-[11px] text-muted-foreground/80">{n.time}</p>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+
+        {notifications.length === 0 && (
+          <div className="px-4 py-10 text-center text-sm text-muted-foreground">
+            No notifications yet.
+          </div>
+        )}
+      </div>
+    </>
   );
 }

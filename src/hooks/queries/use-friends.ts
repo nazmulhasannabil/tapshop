@@ -1,16 +1,33 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { deleteJson, postJson, unwrap } from "@/lib/api/client";
-import { fetchFriends } from "@/lib/query/fetchers";
+import { fetchFriendCounts, fetchFriendsPage } from "@/lib/query/fetchers";
 import { queryKeys } from "@/lib/query/keys";
-import type { FriendsOverview } from "@/lib/services/friends";
+import type { FriendsListKind, FriendsListPage, FriendTabCounts } from "@/lib/services/friends";
 
-export function useFriends(userId: string, initialData?: FriendsOverview) {
+export function useFriendCounts(userId: string, initialData?: FriendTabCounts) {
   return useQuery({
-    queryKey: queryKeys.friends(userId),
-    queryFn: fetchFriends,
+    queryKey: queryKeys.friendsCounts(userId),
+    queryFn: fetchFriendCounts,
     initialData,
+  });
+}
+
+export function useFriendsList(
+  userId: string,
+  list: FriendsListKind,
+  initialPage?: FriendsListPage,
+) {
+  const seeded = initialPage?.list === list ? initialPage : undefined;
+  return useInfiniteQuery({
+    queryKey: queryKeys.friendsList(userId, list),
+    queryFn: ({ pageParam }) => fetchFriendsPage(list, pageParam),
+    initialPageParam: null as string | null,
+    getNextPageParam: (last) => last.nextCursor,
+    initialData: seeded
+      ? { pages: [seeded], pageParams: [null] }
+      : undefined,
   });
 }
 
@@ -67,15 +84,5 @@ export function useRemoveFriend(userId: string) {
       void queryClient.invalidateQueries({ queryKey: ["debts", "summary", userId] });
       void queryClient.invalidateQueries({ queryKey: ["debts", "groups", userId] });
     },
-  });
-}
-
-export function prefetchFriends(
-  queryClient: ReturnType<typeof useQueryClient>,
-  userId: string,
-) {
-  void queryClient.prefetchQuery({
-    queryKey: queryKeys.friends(userId),
-    queryFn: fetchFriends,
   });
 }

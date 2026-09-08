@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -10,7 +11,7 @@ import {
   User,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useFriends } from "@/hooks/queries/use-friends";
+import { useFriendCounts } from "@/hooks/queries/use-friends";
 
 type Tab = {
   href: string;
@@ -49,11 +50,56 @@ const BASE_TABS: Omit<Tab, "badge">[] = [
   { href: "/profile", label: "Profile", icon: User, matches: ["/profile"] },
 ];
 
+function ProfileTabIcon({
+  avatarUrl,
+  active,
+  failed,
+  onError,
+}: {
+  avatarUrl?: string | null;
+  active: boolean;
+  failed: boolean;
+  onError: () => void;
+}) {
+  if (avatarUrl && !failed) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={avatarUrl}
+        alt=""
+        onError={onError}
+        className="size-7 rounded-full border-2 border-white object-cover"
+      />
+    );
+  }
+
+  return (
+    <User
+      className="size-[1.15rem] text-white transition-[fill,stroke-width]"
+      fill={active ? "currentColor" : "none"}
+      strokeWidth={active ? 0 : 1.75}
+      aria-hidden
+    />
+  );
+}
+
 /** Floating pill bottom navigation with filled active / outline inactive icons. */
-export function BottomNav({ userId }: { userId: string }) {
+export function BottomNav({
+  userId,
+  avatarUrl,
+}: {
+  userId: string;
+  avatarUrl?: string | null;
+}) {
   const pathname = usePathname();
-  const { data: friendsOverview } = useFriends(userId);
-  const pendingCount = friendsOverview?.pendingIncoming.length ?? 0;
+  const { data: friendCounts } = useFriendCounts(userId);
+  const pendingCount = friendCounts?.pendingIncoming ?? 0;
+  const [avatarFailed, setAvatarFailed] = useState(false);
+  const showProfileImage = Boolean(avatarUrl) && !avatarFailed;
+
+  useEffect(() => {
+    setAvatarFailed(false);
+  }, [avatarUrl]);
 
   const tabs: Tab[] = BASE_TABS.map((tab) =>
     tab.href === "/friends" ? { ...tab, badge: pendingCount } : tab,
@@ -83,25 +129,34 @@ export function BottomNav({ userId }: { userId: string }) {
               <Link
                 href={tab.href}
                 aria-current={active ? "page" : undefined}
-                className={cn(
-                  "flex h-full flex-col items-center justify-center gap-0.5 text-[10px] font-medium text-primary-foreground transition-opacity",
-                  active ? "opacity-100" : "opacity-70 hover:opacity-100",
-                )}
+                aria-label={tab.href === "/profile" && showProfileImage ? "Profile" : undefined}
+                className="flex h-full flex-col items-center justify-center gap-0.5 text-[10px] font-medium text-white"
               >
                 <span className="relative flex size-7 items-center justify-center">
-                  <Icon
-                    className="size-[1.15rem] text-primary-foreground transition-[fill,stroke-width]"
-                    fill={active ? "currentColor" : "none"}
-                    strokeWidth={active ? 0 : 1.75}
-                    aria-hidden
-                  />
+                  {tab.href === "/profile" ? (
+                    <ProfileTabIcon
+                      avatarUrl={avatarUrl}
+                      active={active}
+                      failed={avatarFailed}
+                      onError={() => setAvatarFailed(true)}
+                    />
+                  ) : (
+                    <Icon
+                      className="size-[1.15rem] text-white transition-[fill,stroke-width]"
+                      fill={active ? "currentColor" : "none"}
+                      strokeWidth={active ? 0 : 1.75}
+                      aria-hidden
+                    />
+                  )}
                   {tab.badge != null && tab.badge > 0 && (
                     <span className="absolute -right-1.5 -top-1 flex size-4 items-center justify-center rounded-full bg-primary-foreground text-[9px] font-bold text-primary">
                       {tab.badge > 9 ? "9+" : tab.badge}
                     </span>
                   )}
                 </span>
-                <span className={cn(active && "font-semibold")}>{tab.label}</span>
+                {!(tab.href === "/profile" && showProfileImage) && (
+                  <span className={cn(active && "font-semibold")}>{tab.label}</span>
+                )}
               </Link>
             </li>
           );

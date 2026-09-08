@@ -17,14 +17,9 @@ export function StatsOverview() {
 
   return (
     <div className="space-y-3">
-      <div className="space-y-1">
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">
-          Your Stats
-        </h1>
-        <p className="text-sm leading-relaxed text-muted-foreground">
-          Track your spending habits and keep your finances in check.
-        </p>
-      </div>
+      <h1 className="text-2xl font-bold tracking-tight text-foreground">
+        Your Stats
+      </h1>
 
       <section className="grid grid-cols-3 gap-2">
         <SoftTile
@@ -32,7 +27,6 @@ export function StatsOverview() {
           tone="primary"
           label="Today"
           value={formatCurrency(stats.todaySpend)}
-          hint={todayTrend(stats.todaySpend, stats.yesterdaySpend)}
         />
         <SoftTile
           icon={<BarChart3 className="size-4" />}
@@ -48,7 +42,7 @@ export function StatsOverview() {
         />
       </section>
 
-      <section className="rounded-2xl bg-card p-5 ring-1 ring-border shadow-sm">
+      <section className="rounded-2xl bg-card p-5">
         <div className="flex items-center justify-between">
           <h2 className="text-base font-bold text-foreground">
             {activityView === "week" ? "Weekly Activity" : "Monthly Activity"}
@@ -100,13 +94,11 @@ function SoftTile({
   label,
   value,
   tone,
-  hint,
 }: {
   icon: ReactNode;
   label: string;
   value: string;
   tone: "primary" | "info" | "success";
-  hint?: string;
 }) {
   const toneClass =
     tone === "primary"
@@ -116,32 +108,20 @@ function SoftTile({
         : "bg-success/10 text-success";
 
   return (
-    <div className="rounded-2xl bg-accent p-3 ring-1 ring-border/60">
+    <div className="flex min-w-0 items-center gap-2 rounded-2xl bg-card px-2.5 py-2">
       <span
-        className={`flex size-8 items-center justify-center rounded-full ${toneClass}`}
+        className={`flex size-7 shrink-0 items-center justify-center rounded-full ${toneClass}`}
       >
         {icon}
       </span>
-      <p className="mt-2.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-        {label}
-      </p>
-      <p className="mt-0.5 text-base font-bold tracking-tight tnum text-foreground sm:text-lg">
-        {value}
-      </p>
-      {hint ? (
-        <p className="mt-0.5 truncate text-[10px] leading-tight text-muted-foreground">
-          {hint}
+      <div className="min-w-0">
+        <p className="truncate text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+          {label}
         </p>
-      ) : null}
+        <p className="truncate text-sm font-bold tracking-tight tnum text-foreground">
+          {value}
+        </p>
+      </div>
     </div>
   );
-}
-
-/** Today-vs-yesterday trend line, e.g. "↘ 12% from yesterday". */
-function todayTrend(today: number, yesterday: number): string {
-  if (yesterday <= 0) {
-    return today > 0 ? "↗ New today" : "No spend yet";
-  }
-  const pct = Math.round((Math.abs(today - yesterday) / yesterday) * 100);
-  return `${today < yesterday ? "↘" : "↗"} ${pct}% from yesterday`;
 }

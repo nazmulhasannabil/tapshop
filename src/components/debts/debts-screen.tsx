@@ -73,7 +73,7 @@ export function DebtsScreen({
       </div>
 
       <section className="grid grid-cols-2 gap-3">
-        <div className="rounded-2xl bg-card p-4 shadow-sm ring-1 ring-foreground/5">
+        <div className="rounded-2xl bg-card py-4">
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             You are owed
           </p>
@@ -81,7 +81,7 @@ export function DebtsScreen({
             {formatCurrency(summary.youAreOwed)}
           </p>
         </div>
-        <div className="rounded-2xl bg-card p-4 shadow-sm ring-1 ring-foreground/5">
+        <div className="rounded-2xl bg-card py-4">
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             You owe
           </p>
@@ -134,11 +134,11 @@ export function DebtsScreen({
           </Button>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-2xl bg-card shadow-sm ring-1 ring-foreground/5">
-          <ul className="divide-y divide-border">
+        <div className="overflow-hidden rounded-2xl bg-card">
+          <ul>
             {groups.flatMap((group) =>
               group.debts.map((d) => (
-                <li key={d.id} className="flex items-center gap-2 px-4 py-3">
+                <li key={d.id} className="flex items-center gap-2 py-3">
                   <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden">
                     <span className="shrink-0 font-semibold text-foreground">
                       {group.counterpartyName}
