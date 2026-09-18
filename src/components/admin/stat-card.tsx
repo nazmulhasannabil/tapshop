@@ -41,7 +41,7 @@ export function StatCard({
           className={cn(
             "flex size-11 shrink-0 items-center justify-center rounded-full",
             isPrimary
-              ? "bg-white/15"
+              ? "bg-primary-foreground/15"
               : embedded && variant === "primary"
                 ? "bg-primary text-primary-foreground"
                 : "bg-accent text-foreground",

@@ -14,6 +14,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/constants";
+import { ItemVisual } from "@/components/billing/item-visual";
 import type { AdminUser, AdminTransaction } from "./types";
 
 type UserDetailsScreenProps = {
@@ -100,7 +101,7 @@ export function UserDetailsScreen({
         {/* Total Spent — indigo card */}
         <section className="rounded-2xl bg-primary p-5 text-primary-foreground shadow-lg shadow-primary/20">
           <div className="flex items-center gap-2.5">
-            <span className="flex size-9 items-center justify-center rounded-full bg-white/15">
+            <span className="flex size-9 items-center justify-center rounded-full bg-primary-foreground/15">
               <Wallet className="size-4" />
             </span>
             <span className="text-xs font-medium uppercase tracking-wide text-primary-foreground/80">
@@ -149,8 +150,13 @@ export function UserDetailsScreen({
           <div className="mt-2 divide-y divide-border/60">
             {transactions.map((tx) => (
               <div key={tx.id} className="flex items-center gap-3 py-3">
-                <span className="flex size-10 items-center justify-center rounded-xl bg-accent text-lg">
-                  {tx.icon}
+                <span className="relative flex size-10 items-center justify-center overflow-hidden rounded-xl bg-accent text-lg">
+                  <ItemVisual
+                    icon={tx.icon}
+                    name={tx.name}
+                    className="absolute inset-0"
+                    emojiClassName="relative flex size-full items-center justify-center text-lg"
+                  />
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-medium text-foreground">

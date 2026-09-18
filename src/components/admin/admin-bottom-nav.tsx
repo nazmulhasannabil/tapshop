@@ -35,10 +35,17 @@ export function AdminBottomNav() {
   return (
     <nav
       aria-label="Admin navigation"
-      className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card shadow-[0_-4px_16px_rgba(0,0,0,0.04)]"
-      style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+      className="fixed inset-x-0 bottom-0 z-40 px-3"
+      style={{
+        paddingBottom: "max(0.5rem, env(safe-area-inset-bottom))",
+      }}
     >
-      <ul className="mx-auto flex h-[var(--bottom-nav-h)] w-full max-w-md items-stretch justify-around">
+      <ul
+        className={cn(
+          "mx-auto flex h-[69px] w-full max-w-md items-stretch justify-around",
+          "rounded-[1.25rem] border border-border bg-[#121927]/95 shadow-[0_8px_28px_rgba(0,0,0,0.45)] backdrop-blur-md",
+        )}
+      >
         {TABS.map((tab) => {
           const active = tab.matches.some(
             (p) => pathname === p || pathname.startsWith(`${p}/`),
@@ -53,7 +60,7 @@ export function AdminBottomNav() {
                   "flex h-full flex-col items-center justify-center gap-1 text-[11px] font-medium transition-colors",
                   active
                     ? "text-primary"
-                    : "text-muted-foreground hover:text-foreground",
+                    : "text-slate-400 hover:text-foreground",
                 )}
               >
                 <span className="relative flex size-7 items-center justify-center">

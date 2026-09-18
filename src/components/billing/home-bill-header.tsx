@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
-import { Bell, CheckCheck, LayoutDashboard, ArrowRight } from "lucide-react";
+import { Bell, CheckCheck, LayoutDashboard, ArrowRight, User } from "lucide-react";
 import { APP_NAME } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import {
@@ -13,22 +13,22 @@ import {
   type Notification,
 } from "@/stores/notification-store";
 import { AnimatedTotal } from "@/components/billing/animated-total";
+import { BrandMark } from "@/components/auth/tapshop-logo";
 
 /**
- * Home-only hero: green brand bar + Today's Bill summary as one composition.
- * Other authenticated screens no longer mount a global AppHeader.
+ * Home header: brand row + Today's Bill emerald card (Figma dark theme).
  */
 export function HomeBillHeader({
   isAdmin,
+  userName,
   count,
   total,
-  progressPct,
   onViewBill,
 }: {
   isAdmin?: boolean;
+  userName?: string | null;
   count: number;
   total: number;
-  progressPct: number;
   onViewBill: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -40,6 +40,7 @@ export function HomeBillHeader({
   const unread = notifications.filter((n) => !readIds.has(n.id));
   const unreadCount = unread.length;
   const hasItems = count > 0;
+  const displayName = userName?.trim() || "You";
 
   useEffect(() => {
     if (!open) return;
@@ -55,116 +56,127 @@ export function HomeBillHeader({
   }, [pathname]);
 
   return (
-    <header className="relative -mt-[env(safe-area-inset-top)] overflow-hidden rounded-b-3xl bg-primary pt-[env(safe-area-inset-top)] text-primary-foreground">
-      {/* Soft decorative wash */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute -right-16 -top-20 size-56 rounded-full bg-primary-foreground/10"
-      />
-      <div
-        aria-hidden
-        className="pointer-events-none absolute -bottom-10 -left-10 size-40 rounded-full bg-primary-foreground/10"
-      />
-
-      <div className="relative mx-auto w-full max-w-md px-4 pb-7 pt-2">
-        {/* Brand row */}
-        <div className="flex h-12 items-center justify-between">
-          <div className="flex items-center gap-2">
-            <h1 className="text-xl font-bold tracking-tight">{APP_NAME}</h1>
-            {isAdmin && (
-              <Link
-                href="/dashboard"
-                className="inline-flex items-center gap-1 rounded-full bg-primary-foreground/15 px-2.5 py-0.5 text-[11px] font-semibold text-primary-foreground transition hover:bg-primary-foreground/25 active:scale-95"
-              >
-                <LayoutDashboard className="size-3" />
-                Admin
-              </Link>
-            )}
-          </div>
-
-          <div className="relative">
-            <button
-              ref={bellRef}
-              type="button"
-              aria-label="Notifications"
-              aria-haspopup="dialog"
-              aria-expanded={open}
-              onClick={() => setOpen((v) => !v)}
-              className="relative flex size-9 items-center justify-center text-primary-foreground transition hover:opacity-80 active:scale-90"
+    <header className="relative mx-auto w-full max-w-md px-5 pt-1">
+      {/* Brand row */}
+      <div className="flex h-14 items-center justify-between">
+        <div className="flex items-center gap-2.5">
+          <BrandMark className="size-9" />
+          <h1 className="text-xl font-bold tracking-tight text-white">{APP_NAME}</h1>
+          {isAdmin && (
+            <Link
+              href="/dashboard"
+              className="inline-flex items-center gap-1 rounded-lg border border-border bg-card px-2 py-0.5 text-[11px] font-semibold text-muted-foreground transition hover:text-foreground active:scale-95"
             >
-              <Bell className="size-5" />
-              {unreadCount > 0 && (
-                <span
-                  aria-hidden
-                  className="absolute right-1.5 top-1.5 size-2 rounded-full bg-destructive ring-2 ring-primary"
-                />
-              )}
-            </button>
-
-            {open &&
-              createPortal(
-                <NotificationMenu
-                  anchor={bellRef.current}
-                  notifications={notifications}
-                  readIds={readIds}
-                  unreadCount={unreadCount}
-                  onClose={() => setOpen(false)}
-                  onMarkAllRead={markAllRead}
-                />,
-                document.body,
-              )}
-          </div>
+              <LayoutDashboard className="size-3" />
+              Admin
+            </Link>
+          )}
         </div>
 
-        {/* Today's Bill summary — same green surface */}
-        <section aria-label="Today's bill" className="mt-3">
-          <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold uppercase tracking-wide text-primary-foreground/80">
+        <div className="relative">
+          <button
+            ref={bellRef}
+            type="button"
+            aria-label="Notifications"
+            aria-haspopup="dialog"
+            aria-expanded={open}
+            onClick={() => setOpen((v) => !v)}
+            className="relative flex size-10 items-center justify-center rounded-full border border-border bg-card text-slate-300 transition hover:text-white active:scale-90"
+          >
+            <Bell className="size-5" />
+            {unreadCount > 0 && (
+              <span
+                aria-hidden
+                className="absolute right-2 top-2 size-2.5 rounded-full bg-red-500 ring-2 ring-[#0b101d]"
+              />
+            )}
+          </button>
+
+          {open &&
+            createPortal(
+              <NotificationMenu
+                anchor={bellRef.current}
+                notifications={notifications}
+                readIds={readIds}
+                unreadCount={unreadCount}
+                onClose={() => setOpen(false)}
+                onMarkAllRead={markAllRead}
+              />,
+              document.body,
+            )}
+        </div>
+      </div>
+
+      {/* Today's Bill card */}
+      <section
+        aria-label="Today's bill"
+        className="relative mt-1 overflow-hidden rounded-2xl border border-emerald-500/25 p-[17px] shadow-[0_20px_25px_-5px_rgba(2,44,34,0.4),0_8px_10px_-6px_rgba(2,44,34,0.4)]"
+        style={{
+          backgroundImage:
+            "linear-gradient(156deg, rgb(6, 78, 59) 0%, rgb(4, 54, 40) 50%, rgb(2, 35, 27) 100%)",
+        }}
+      >
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -right-8 -top-8 size-36 rounded-full bg-emerald-400/10 blur-2xl"
+        />
+        <div
+          aria-hidden
+          className="pointer-events-none absolute bottom-0 left-1/3 h-20 w-32 rounded-full bg-teal-400/10 blur-xl"
+        />
+
+        <div className="relative flex items-start justify-between gap-3">
+          <div className="min-w-0 pt-1">
+            <p className="text-[11px] font-bold uppercase tracking-[0.55px] text-emerald-300/80">
               Today&apos;s Bill
             </p>
-            <span className="rounded-full bg-primary-foreground/15 px-2.5 py-0.5 text-xs font-semibold text-primary-foreground">
-              {count} {count === 1 ? "item" : "items"}
-            </span>
-          </div>
-
-          <div className="mt-1 flex items-end justify-between gap-3">
             <AnimatedTotal
               value={total}
-              className="block text-3xl font-bold tracking-tight text-primary-foreground"
+              className="mt-1 block text-4xl font-black tracking-tight text-white"
             />
+          </div>
+
+          <div className="flex shrink-0 flex-col items-end gap-2.5">
+            <span className="rounded-full bg-[rgba(2,44,34,0.8)] px-3 py-1 text-xs font-semibold text-emerald-300">
+              {count} {count === 1 ? "item" : "items"}
+            </span>
             <button
               type="button"
               onClick={hasItems ? onViewBill : undefined}
               disabled={!hasItems}
-              aria-label="View bill"
+              aria-label="Review bill"
               className={cn(
-                "mb-0.5 inline-flex shrink-0 items-center gap-1 rounded-full bg-primary-foreground px-3.5 py-2 text-sm font-semibold text-primary shadow-sm transition",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/60 focus-visible:ring-offset-2 focus-visible:ring-offset-primary",
+                "inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-bold text-primary-foreground shadow-md shadow-emerald-950/50 transition",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300/60",
                 hasItems
-                  ? "hover:bg-primary-foreground/90 active:scale-95"
+                  ? "hover:bg-emerald-400 active:scale-95"
                   : "pointer-events-none opacity-50",
               )}
             >
-              View Bill
-              <ArrowRight className="size-4" />
+              Review
+              <ArrowRight className="size-3.5" strokeWidth={2.5} />
             </button>
           </div>
+        </div>
 
-          <div
-            className="mt-3 h-2 w-full overflow-hidden rounded-full bg-primary-foreground/20"
-            role="progressbar"
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-valuenow={progressPct}
-            aria-label={`Spent ${progressPct}% of daily target`}
-          >
-            <div
-              className="h-full rounded-full bg-primary-foreground transition-all duration-300"
-              style={{ width: `${progressPct}%` }}
-            />
+        <div className="relative mt-4 flex items-center justify-between border-t border-emerald-500/15 pt-3">
+          <div className="flex items-center gap-1.5">
+            <span className="relative flex size-2">
+              <span className="absolute inset-0 animate-ping rounded-full bg-emerald-400 opacity-75" />
+              <span className="relative size-2 rounded-full bg-emerald-400" />
+            </span>
+            <span className="text-[11px] font-medium text-emerald-300/80">Active</span>
           </div>
-        </section>
-      </div>
+          <div className="flex items-center gap-1.5 rounded-full bg-[rgba(2,44,34,0.8)] px-2.5 py-0.5">
+            <span className="flex size-3.5 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-300">
+              <User className="size-2.5" strokeWidth={2.5} />
+            </span>
+            <span className="max-w-[7rem] truncate text-[11px] font-medium text-emerald-300">
+              {displayName}
+            </span>
+          </div>
+        </div>
+      </section>
     </header>
   );
 }
@@ -217,10 +229,10 @@ function NotificationMenu({
       <div
         role="dialog"
         aria-label="Notifications"
-        className="fixed z-[80] w-80 max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl bg-card text-card-foreground shadow-xl ring-1 ring-foreground/5"
+        className="fixed z-[80] w-80 max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-border bg-popover text-popover-foreground shadow-xl"
         style={{ top: pos.top, right: pos.right }}
       >
-        <div className="flex items-center justify-between border-b border-border/60 px-4 py-3">
+        <div className="flex items-center justify-between border-b border-border px-4 py-3">
           <h2 className="text-sm font-bold text-foreground">Notifications</h2>
           {unreadCount > 0 && (
             <button
@@ -234,7 +246,7 @@ function NotificationMenu({
           )}
         </div>
 
-        <ul className="max-h-[min(60vh,24rem)] divide-y divide-border/60 overflow-y-auto">
+        <ul className="max-h-[min(60vh,24rem)] divide-y divide-border overflow-y-auto">
           {notifications.map((n) => {
             const isUnread = !readIds.has(n.id);
             return (
@@ -242,7 +254,7 @@ function NotificationMenu({
                 key={n.id}
                 className={cn(
                   "flex gap-3 px-4 py-3 transition",
-                  isUnread ? "bg-primary/5" : "bg-card",
+                  isUnread ? "bg-primary/10" : "bg-popover",
                 )}
               >
                 <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-lg">

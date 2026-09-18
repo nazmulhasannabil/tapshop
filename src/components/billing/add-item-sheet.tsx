@@ -56,20 +56,25 @@ export function AddItemSheet({
   open,
   onOpenChange,
   onCreate,
+  onUpdate,
+  editItem = null,
   categories,
   onCategoryCreate,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onCreate: (item: CatalogItem) => void;
+  onUpdate?: (item: CatalogItem) => void;
+  editItem?: CatalogItem | null;
   categories: ItemCategory[];
   onCategoryCreate: (category: ItemCategory) => void;
 }) {
-  const { createItem, createCategory } = useBill();
+  const { createItem, updateItem, createCategory } = useBill();
   const [pending, setPending] = useState(false);
   const [creatingCategory, setCreatingCategory] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
   const [showNewCategory, setShowNewCategory] = useState(false);
+  const isEditing = !!editItem;
 
   const {
     register,
@@ -83,25 +88,52 @@ export function AddItemSheet({
     defaultValues: { name: "", price: "", icon: "", categoryId: "" },
   });
 
-  // Reset the form whenever the sheet is closed.
+  // Reset / prefill whenever the sheet opens or the edit target changes.
   useEffect(() => {
     if (!open) {
       reset({ name: "", price: "", icon: "", categoryId: "" });
       setShowNewCategory(false);
       setNewCategoryName("");
+      return;
     }
-  }, [open, reset]);
+
+    if (editItem) {
+      reset({
+        name: editItem.name,
+        price: String(editItem.price),
+        icon: editItem.icon ?? "",
+        categoryId: editItem.categoryId,
+      });
+    } else {
+      reset({ name: "", price: "", icon: "", categoryId: "" });
+    }
+    setShowNewCategory(false);
+    setNewCategoryName("");
+  }, [open, editItem, reset]);
 
   const iconValue = watch("icon");
 
   async function onSubmit(values: AddFormFields) {
     setPending(true);
-    const res = await createItem({
+    const payload = {
       name: values.name,
       price: Number(values.price),
       icon: values.icon || null,
       categoryId: values.categoryId,
-    });
+    };
+
+    if (isEditing && editItem) {
+      const res = await updateItem(editItem.id, payload);
+      setPending(false);
+      if (res.ok) {
+        toast.success(`${res.data.name} updated`);
+        onUpdate?.(res.data);
+        onOpenChange(false);
+      }
+      return;
+    }
+
+    const res = await createItem(payload);
     setPending(false);
     if (res.ok) {
       toast.success(`${res.data.name} added 🎉`);
@@ -132,9 +164,13 @@ export function AddItemSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="bottom" className="gap-0 rounded-t-3xl p-0">
         <SheetHeader className="border-b">
-          <SheetTitle className="text-center text-lg">Add a new item</SheetTitle>
+          <SheetTitle className="text-center text-lg">
+            {isEditing ? "Edit item" : "Add a new item"}
+          </SheetTitle>
           <SheetDescription className="text-center">
-            One tap and it&apos;s ready to use.
+            {isEditing
+              ? "Update the name, price, or category."
+              : "One tap and it's ready to use."}
           </SheetDescription>
         </SheetHeader>
 
@@ -268,7 +304,13 @@ export function AddItemSheet({
               className="h-12 w-full rounded-xl text-base font-semibold"
             >
               {pending && <Loader2 className="animate-spin" />}
-              {pending ? "Creating…" : "Create item"}
+              {pending
+                ? isEditing
+                  ? "Saving…"
+                  : "Creating…"
+                : isEditing
+                  ? "Save changes"
+                  : "Create item"}
             </Button>
           </SheetFooter>
         </form>

@@ -100,7 +100,7 @@ export async function createSessionFromFirebaseIdToken(idToken: string) {
   }
 
   if (!user) {
-    const name = decoded.name?.trim() || email.split("@")[0] || "TapShop user";
+    const name = decoded.name?.trim() || email.split("@")[0] || "Money Back user";
     user = await ctx.internalAdapter.createUser({
       name,
       email,

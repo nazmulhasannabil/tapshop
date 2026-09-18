@@ -8,7 +8,7 @@ export async function generateMetadata({ params }: Props) {
   const { id } = await params;
   const data = await getAdminUserDetails(id);
   return {
-    title: data ? `${data.user.name} — TapShop Admin` : "User — TapShop Admin",
+    title: data ? `${data.user.name} — Money Back Admin` : "User — Money Back Admin",
   };
 }
 

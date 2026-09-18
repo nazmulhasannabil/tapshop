@@ -73,19 +73,19 @@ export function DebtsScreen({
       </div>
 
       <section className="grid grid-cols-2 gap-3">
-        <div className="rounded-2xl bg-card py-4">
+        <div className="rounded-2xl border border-border bg-card px-4 py-4">
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             You are owed
           </p>
-          <p className="mt-2 text-xl font-bold text-emerald-600 tnum dark:text-emerald-400">
+          <p className="mt-2 text-xl font-bold text-primary tnum">
             {formatCurrency(summary.youAreOwed)}
           </p>
         </div>
-        <div className="rounded-2xl bg-card py-4">
+        <div className="rounded-2xl border border-border bg-card px-4 py-4">
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             You owe
           </p>
-          <p className="mt-2 text-xl font-bold text-amber-700 tnum dark:text-amber-400">
+          <p className="mt-2 text-xl font-bold text-amber-400 tnum">
             {formatCurrency(summary.youOwe)}
           </p>
         </div>
@@ -98,8 +98,8 @@ export function DebtsScreen({
             className={cn(
               "font-semibold tnum",
               summary.net >= 0
-                ? "text-emerald-600 dark:text-emerald-400"
-                : "text-amber-700 dark:text-amber-400",
+                ? "text-primary"
+                : "text-amber-400",
             )}
           >
             {summary.net >= 0 ? "+" : "−"}

@@ -4,7 +4,7 @@ import {
 } from "@/lib/services/admin";
 import { SpendingsScreen } from "@/components/admin/spendings-screen";
 
-export const metadata = { title: "Spendings — TapShop Admin" };
+export const metadata = { title: "Spendings — Money Back Admin" };
 
 export default async function SpendingsPage({
   searchParams,

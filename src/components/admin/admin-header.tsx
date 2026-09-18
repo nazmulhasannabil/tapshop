@@ -1,6 +1,7 @@
 "use client";
 
 import { Bell } from "lucide-react";
+import { BrandMark } from "@/components/auth/tapshop-logo";
 import { APP_NAME } from "@/lib/constants";
 
 /** TapShop admin header — logo + brand + notification bell. */
@@ -10,10 +11,8 @@ export function AdminHeader() {
       <div className="mx-auto flex h-14 max-w-md items-center justify-between px-4">
         {/* Logo + brand */}
         <div className="flex items-center gap-2.5">
-          <span className="flex size-8 items-center justify-center rounded-lg bg-primary text-sm font-bold text-primary-foreground">
-            T
-          </span>
-          <h1 className="text-lg font-bold text-primary">{APP_NAME}</h1>
+          <BrandMark className="size-8" />
+          <h1 className="text-lg font-bold text-white">{APP_NAME}</h1>
         </div>
 
         {/* Notification bell */}

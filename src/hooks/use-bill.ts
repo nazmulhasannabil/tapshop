@@ -2,7 +2,7 @@
 
 import { useCallback } from "react";
 import { toast } from "sonner";
-import { postJson } from "@/lib/api/client";
+import { deleteJson, patchJson, postJson } from "@/lib/api/client";
 import { useBillStore } from "@/stores/bill-store";
 import type { ItemCategory } from "@/lib/item-categories";
 import type {
@@ -74,11 +74,42 @@ export function useBill() {
     [],
   );
 
+  const updateItem = useCallback(
+    async (
+      itemId: string,
+      input: {
+        name: string;
+        price: number;
+        icon?: string | null;
+        categoryId: string;
+      },
+    ): Promise<ApiResult<CatalogItem>> => {
+      const res = await patchJson<CatalogItem>(`/api/items/${itemId}`, input);
+      if (!res.ok) toast.error(res.error || "Couldn't update that item.");
+      return res;
+    },
+    [],
+  );
+
+  const deleteItem = useCallback(async (itemId: string): Promise<ApiResult<{ id: string }>> => {
+    const res = await deleteJson<{ id: string }>(`/api/items/${itemId}`);
+    if (!res.ok) toast.error(res.error || "Couldn't delete that item.");
+    return res;
+  }, []);
+
   const createCategory = useCallback(async (name: string): Promise<ApiResult<ItemCategory>> => {
     const res = await postJson<ItemCategory>("/api/categories", { name });
     if (!res.ok) toast.error(res.error || "Couldn't create that category.");
     return res;
   }, []);
 
-  return { addItem, decreaseItem, removeEntry, createItem, createCategory };
+  return {
+    addItem,
+    decreaseItem,
+    removeEntry,
+    createItem,
+    updateItem,
+    deleteItem,
+    createCategory,
+  };
 }

@@ -11,10 +11,14 @@ export const createItemSchema = z.object({
     .number()
     .positive("Price must be greater than 0.")
     .max(100000, "That price looks off."),
-  icon: z.string().trim().max(10, "Use a short emoji or icon.").optional().nullable(),
+  icon: z.string().trim().max(200, "Icon path is too long.").optional().nullable(),
   categoryId: z.string().trim().min(1, "Pick a category."),
 });
 export type CreateItemInput = z.infer<typeof createItemSchema>;
+
+/** Body shape for PATCH /api/items/[id] (update item). */
+export const updateItemSchema = createItemSchema;
+export type UpdateItemInput = z.infer<typeof updateItemSchema>;
 
 /** Body shape for POST /api/categories (create category). */
 export const createCategorySchema = z.object({

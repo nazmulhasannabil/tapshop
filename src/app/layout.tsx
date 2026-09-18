@@ -17,22 +17,19 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "TapShop — Shop Bill Tracker",
+  title: "Money Back — Shop Bill Tracker",
   description:
     "Tap an item, your bill updates instantly. A fast, friendly way to track personal consumption at your regular shop.",
-  applicationName: "TapShop",
+  applicationName: "Money Back",
   appleWebApp: {
     capable: true,
-    statusBarStyle: "default",
-    title: "TapShop",
+    statusBarStyle: "black-translucent",
+    title: "Money Back",
   },
 };
 
 export const viewport: Viewport = {
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
-    { media: "(prefers-color-scheme: dark)", color: "#0f1a14" },
-  ],
+  themeColor: "#0b101d",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1, // prevent accidental zoom on double-tap of item cards
@@ -45,12 +42,13 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html
       lang="en"
       suppressHydrationWarning
-      className={`${jakartaSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${jakartaSans.variable} ${geistMono.variable} dark h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">
+      <body className="min-h-full flex flex-col bg-background text-foreground">
         <ThemeProvider
           attribute="class"
-          defaultTheme="light"
+          defaultTheme="dark"
+          enableSystem={false}
           disableTransitionOnChange
         >
           {children}

@@ -23,7 +23,7 @@ async function ensureSystemUser(): Promise<void> {
     .insert(users)
     .values({
       id: SYSTEM_USER_ID,
-      name: "TapShop",
+      name: "Money Back",
       email: "system@tapshop.local",
       emailVerified: true,
       role: "user",

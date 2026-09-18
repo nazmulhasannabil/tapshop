@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/sheet";
 import { formatCurrency, formatRelativeTime, formatYmdDate } from "@/lib/constants";
 import type { SavedBill } from "@/types/bill";
+import { ItemVisual } from "@/components/billing/item-visual";
 
 /**
  * Bottom sheet showing the full item breakdown of a saved bill (the read-only
@@ -51,7 +52,14 @@ function DetailBody({ bill }: { bill: SavedBill }) {
             key={`${bill.id}-${index}`}
             className="flex items-center gap-3 border-b border-border py-3 last:border-0"
           >
-            <span className="text-2xl leading-none">{item.icon ?? "🍽️"}</span>
+            <span className="relative flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-accent text-2xl leading-none">
+              <ItemVisual
+                icon={item.icon}
+                name={item.name}
+                className="absolute inset-0"
+                emojiClassName="relative flex size-full items-center justify-center text-2xl"
+              />
+            </span>
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-medium">{item.name}</p>
               <p className="tnum text-xs text-muted-foreground">

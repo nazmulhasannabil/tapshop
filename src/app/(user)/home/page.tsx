@@ -24,6 +24,7 @@ export default async function HomePage() {
       recent={recent}
       categories={categories}
       isAdmin={session.user.role === "admin"}
+      userName={session.user.name}
     />
   );
 }

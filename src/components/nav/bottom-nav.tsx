@@ -68,14 +68,20 @@ function ProfileTabIcon({
         src={avatarUrl}
         alt=""
         onError={onError}
-        className="size-7 rounded-full border-2 border-white object-cover"
+        className={cn(
+          "size-7 rounded-full object-cover",
+          active ? "ring-2 ring-primary" : "ring-1 ring-border",
+        )}
       />
     );
   }
 
   return (
     <User
-      className="size-[1.15rem] text-white transition-[fill,stroke-width]"
+      className={cn(
+        "size-5 transition-colors",
+        active ? "text-primary" : "text-slate-400",
+      )}
       fill={active ? "currentColor" : "none"}
       strokeWidth={active ? 0 : 1.75}
       aria-hidden
@@ -83,7 +89,7 @@ function ProfileTabIcon({
   );
 }
 
-/** Floating pill bottom navigation with filled active / outline inactive icons. */
+/** Dark floating island bottom nav with emerald active state (Figma). */
 export function BottomNav({
   userId,
   avatarUrl,
@@ -115,8 +121,8 @@ export function BottomNav({
     >
       <ul
         className={cn(
-          "mx-auto flex h-16 w-full max-w-md items-stretch justify-around",
-          "rounded-[1.35rem] bg-primary shadow-[0_8px_28px_rgba(0,166,81,0.35)]",
+          "mx-auto flex h-[69px] w-full max-w-md items-stretch justify-around px-2",
+          "rounded-[1.25rem] border border-border bg-[#121927]/95 shadow-[0_8px_28px_rgba(0,0,0,0.45),0_0_0_1px_rgba(16,185,129,0.08)] backdrop-blur-md",
         )}
       >
         {tabs.map((tab) => {
@@ -124,15 +130,19 @@ export function BottomNav({
             (p) => pathname === p || pathname.startsWith(`${p}/`),
           );
           const Icon = tab.icon;
+          const isHome = tab.href === "/home";
           return (
             <li key={tab.href} className="flex-1">
               <Link
                 href={tab.href}
                 aria-current={active ? "page" : undefined}
                 aria-label={tab.href === "/profile" && showProfileImage ? "Profile" : undefined}
-                className="flex h-full flex-col items-center justify-center gap-0.5 text-[10px] font-medium text-white"
+                className={cn(
+                  "flex h-full flex-col items-center justify-center gap-1 text-[10px] font-medium transition-colors",
+                  active ? "text-primary" : "text-slate-400",
+                )}
               >
-                <span className="relative flex size-7 items-center justify-center">
+                <span className="relative flex size-8 items-center justify-center">
                   {tab.href === "/profile" ? (
                     <ProfileTabIcon
                       avatarUrl={avatarUrl}
@@ -140,16 +150,20 @@ export function BottomNav({
                       failed={avatarFailed}
                       onError={() => setAvatarFailed(true)}
                     />
+                  ) : isHome && active ? (
+                    <span className="flex size-8 items-center justify-center rounded-full border border-emerald-400/40 bg-emerald-500/15 text-xs font-bold text-primary shadow-[0_0_12px_rgba(16,185,129,0.35)]">
+                      T
+                    </span>
                   ) : (
                     <Icon
-                      className="size-[1.15rem] text-white transition-[fill,stroke-width]"
+                      className="size-5 transition-[fill,stroke-width,color]"
                       fill={active ? "currentColor" : "none"}
                       strokeWidth={active ? 0 : 1.75}
                       aria-hidden
                     />
                   )}
                   {tab.badge != null && tab.badge > 0 && (
-                    <span className="absolute -right-1.5 -top-1 flex size-4 items-center justify-center rounded-full bg-primary-foreground text-[9px] font-bold text-primary">
+                    <span className="absolute -right-1 -top-0.5 flex size-4 items-center justify-center rounded-full bg-primary text-[9px] font-bold text-primary-foreground">
                       {tab.badge > 9 ? "9+" : tab.badge}
                     </span>
                   )}

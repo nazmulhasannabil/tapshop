@@ -19,6 +19,7 @@ import { useSession } from "@/lib/auth/client";
 import { cn } from "@/lib/utils";
 import { AnimatedTotal } from "./animated-total";
 import { EmptyState } from "./empty-state";
+import { ItemVisual } from "./item-visual";
 
 export function BillSheet({
   open,
@@ -73,8 +74,13 @@ export function BillSheet({
                   key={entry.itemId}
                   className="flex items-center gap-3 border-b border-border py-3.5 last:border-0"
                 >
-                  <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-accent text-2xl leading-none">
-                    {entry.icon ?? "🍽️"}
+                  <span className="relative flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-accent text-2xl leading-none">
+                    <ItemVisual
+                      icon={entry.icon}
+                      name={entry.name}
+                      className="absolute inset-0"
+                      emojiClassName="relative flex size-full items-center justify-center text-2xl"
+                    />
                   </span>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-semibold">{entry.name}</p>

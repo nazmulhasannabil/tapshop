@@ -2,11 +2,13 @@
 
 import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { motion } from "motion/react";
 
 import { useSession } from "@/lib/auth/client";
-import { APP_MOTTO, APP_NAME, ONBOARDING_COOKIE } from "@/lib/constants";
+import { BrandMark } from "@/components/auth/tapshop-logo";
+import { APP_MOTTO, APP_NAME } from "@/lib/constants";
 
-const MIN_DISPLAY_MS = 1500;
+const MIN_DISPLAY_MS = 3000;
 
 export function OnboardingScreen() {
   const router = useRouter();
@@ -22,7 +24,6 @@ export function OnboardingScreen() {
 
     const timer = setTimeout(() => {
       redirected.current = true;
-      document.cookie = `${ONBOARDING_COOKIE}=1; path=/; max-age=31536000; SameSite=Lax`;
       router.replace(session ? "/home" : "/login");
     }, remaining);
 
@@ -30,14 +31,22 @@ export function OnboardingScreen() {
   }, [isPending, session, router]);
 
   return (
-    <div className="flex min-h-[100dvh] flex-col items-center justify-center bg-gradient-to-b from-accent via-background to-background px-4 py-10">
-      <div className="flex flex-col items-center gap-3 select-none">
-        <span className="flex size-14 items-center justify-center rounded-2xl bg-primary text-2xl text-primary-foreground shadow-md shadow-primary/25">
-          🧾
-        </span>
-        <span className="text-2xl font-bold tracking-tight text-primary">{APP_NAME}</span>
+    <div className="flex min-h-[100dvh] flex-col items-center justify-center bg-background px-4 py-10">
+      <motion.div
+        className="flex flex-col items-center gap-3 select-none"
+        initial={{ opacity: 0, scale: 0.94 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.45, ease: "easeOut" }}
+      >
+        <motion.div
+          animate={{ y: [0, -6, 0] }}
+          transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
+        >
+          <BrandMark className="size-14" />
+        </motion.div>
+        <span className="text-2xl font-bold tracking-tight text-white">{APP_NAME}</span>
         <p className="text-sm text-muted-foreground">{APP_MOTTO}</p>
-      </div>
+      </motion.div>
     </div>
   );
 }

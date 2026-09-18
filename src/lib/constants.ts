@@ -2,12 +2,9 @@ import { ymdInAppTimezone } from "@/lib/timezone";
 
 /** App-wide constants and formatting helpers. */
 
-export const APP_NAME = "TapShop";
+export const APP_NAME = "Money Back";
 
 export const APP_MOTTO = "Add your bill in a single tap";
-
-/** Cookie set after the first onboarding splash so repeat visits skip it. */
-export const ONBOARDING_COOKIE = "tapshop_onboarding_done";
 
 /**
  * Default daily spending target (৳) used by the home screen's "Today's Bill"

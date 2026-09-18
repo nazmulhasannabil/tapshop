@@ -2,7 +2,7 @@
   "auth": {
     "providers": {
       "googleSignIn": {
-        "oAuthBrandDisplayName": "TapShop",
+        "oAuthBrandDisplayName": "Money Back",
         "supportEmail": "nazmulhasannabil4@gmail.com",
         "authorizedRedirectUris": [
           "http://localhost",

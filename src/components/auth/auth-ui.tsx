@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
 
 export function AuthCard({ children }: { children: ReactNode }) {
   return (
-    <section className="relative rounded-[1.75rem] bg-card px-6 pt-5 pb-7 shadow-[0_12px_36px_-18px_oklch(0.2_0.02_155/0.22)] ring-1 ring-border/70">
+    <section className="relative rounded-[1.75rem] border border-border bg-card px-6 pt-5 pb-7 shadow-[0_12px_36px_-12px_rgba(0,0,0,0.55)]">
       <AuthBackButton />
       <div className="mb-6 flex justify-center pt-1">
         <TapShopLogo />
@@ -63,7 +63,7 @@ export function AuthHeader({
 }
 
 const fieldClassName =
-  "h-12 rounded-full border-border/80 bg-card px-11 text-sm shadow-none placeholder:text-muted-foreground/80 focus-visible:border-ring focus-visible:ring-2 md:text-sm";
+  "h-12 rounded-full border-border bg-background px-11 text-sm shadow-none placeholder:text-muted-foreground/80 focus-visible:border-ring focus-visible:ring-2 md:text-sm";
 
 function scrollFieldIntoView(target: EventTarget | null) {
   if (!(target instanceof HTMLElement)) return;

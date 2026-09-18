@@ -75,6 +75,8 @@ export const ACTION = {
   USER_DECREASED_QUANTITY: "user_decreased_quantity",
   USER_REMOVED_ENTRY: "user_removed_entry",
   USER_CREATED_ITEM: "user_created_item",
+  USER_UPDATED_ITEM: "user_updated_item",
+  USER_DELETED_ITEM: "user_deleted_item",
   ADMIN_CORRECTED_ENTRY: "admin_corrected_entry",
   ADMIN_DELETED_ENTRY: "admin_deleted_entry",
   ADMIN_CHANGED_ITEM: "admin_changed_item",

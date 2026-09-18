@@ -22,7 +22,7 @@ const SEED_NOTIFICATIONS: Notification[] = [
   {
     id: "1",
     icon: "🎉",
-    title: "Welcome to TapShop!",
+    title: "Welcome to Money Back!",
     body: "Tap a drink to start tracking today's bill.",
     time: "just now",
   },

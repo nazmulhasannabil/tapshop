@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
@@ -220,7 +220,7 @@ export function FriendsScreen({
   }
 
   return (
-    <main className="mx-auto flex w-full max-w-md flex-col gap-4 bg-white px-4 py-5 pb-[calc(var(--bottom-nav-h)+1.5rem)]">
+    <main className="mx-auto flex w-full max-w-md flex-col gap-4 bg-background px-4 py-5 pb-[calc(var(--bottom-nav-h)+1.5rem)]">
       <div className="flex items-center justify-between gap-3">
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-foreground">Friends</h2>
@@ -234,7 +234,7 @@ export function FriendsScreen({
         </Button>
       </div>
 
-      <div className="sticky top-0 z-10 -mx-4 bg-white/95 px-4 py-2 backdrop-blur">
+      <div className="sticky top-0 z-10 -mx-4 bg-background/95 px-4 py-2 backdrop-blur">
         <div ref={tabScrollerRef} className="no-scrollbar flex gap-2 overflow-x-auto">
           {TABS.map((item) => {
             const active = tab === item.id;
@@ -252,7 +252,7 @@ export function FriendsScreen({
                   "shrink-0 rounded-full px-3.5 py-1.5 text-sm font-semibold transition-colors",
                   active
                     ? "bg-primary text-primary-foreground"
-                    : "border border-border bg-white text-muted-foreground hover:text-foreground",
+                    : "border border-border bg-card text-muted-foreground hover:text-foreground",
                 )}
               >
                 {item.label}
@@ -276,7 +276,7 @@ export function FriendsScreen({
       ) : items.length === 0 ? (
         <EmptyTab tab={tab} onInvite={() => setInviteOpen(true)} />
       ) : (
-        <div className={tab === "friends" ? undefined : "overflow-hidden rounded-2xl bg-white"}>
+        <div className={tab === "friends" ? undefined : "overflow-hidden rounded-2xl bg-card"}>
           <ul className={tab === "friends" ? "flex flex-col gap-3" : "divide-y divide-border"}>
             {items.map((item) =>
               tab === "suggestions" && isSuggestion(item) ? (
@@ -424,7 +424,7 @@ function FriendMenu({ busy, onRemove }: { busy: boolean; onRemove: () => void })
         {busy ? <Loader2 className="size-4 animate-spin" /> : <MoreHorizontal className="size-5" />}
       </button>
       {open && (
-        <div className="absolute right-0 top-9 z-20 min-w-36 overflow-hidden rounded-xl border border-border bg-white py-1 shadow-md">
+        <div className="absolute right-0 top-9 z-20 min-w-36 overflow-hidden rounded-xl border border-border bg-card py-1 shadow-md">
           <button
             type="button"
             className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-foreground hover:bg-muted"
@@ -473,7 +473,7 @@ function FriendIdCard({
     <li
       className={cn(
         "relative flex items-start gap-3 px-4 py-3.5",
-        separated ? "rounded-2xl bg-white" : "bg-white",
+        separated ? "rounded-2xl bg-card" : "bg-card",
       )}
     >
       <Avatar initial={name} image={image} />
@@ -495,7 +495,7 @@ function FriendIdCard({
 function EmptyTab({ tab, onInvite }: { tab: FriendsListKind; onInvite: () => void }) {
   if (tab === "friends") {
     return (
-      <div className="flex flex-col items-center gap-3 rounded-2xl bg-white px-6 py-10 text-center">
+      <div className="flex flex-col items-center gap-3 rounded-2xl bg-card px-6 py-10 text-center">
         <Users className="size-8 text-muted-foreground" />
         <p className="font-semibold text-foreground">No friends yet</p>
         <p className="text-sm text-muted-foreground">
@@ -511,7 +511,7 @@ function EmptyTab({ tab, onInvite }: { tab: FriendsListKind; onInvite: () => voi
 
   if (tab === "requests") {
     return (
-      <div className="flex flex-col items-center gap-3 rounded-2xl bg-white px-6 py-10 text-center">
+      <div className="flex flex-col items-center gap-3 rounded-2xl bg-card px-6 py-10 text-center">
         <p className="font-semibold text-foreground">No requests</p>
         <p className="text-sm text-muted-foreground">
           Incoming requests and invites you sent show up here.
@@ -525,7 +525,7 @@ function EmptyTab({ tab, onInvite }: { tab: FriendsListKind; onInvite: () => voi
   }
 
   return (
-    <div className="rounded-2xl bg-white px-6 py-10 text-center">
+    <div className="rounded-2xl bg-card px-6 py-10 text-center">
       <p className="font-semibold text-foreground">No suggestions</p>
       <p className="mt-1 text-sm text-muted-foreground">
         People your friends know will appear here.
@@ -563,7 +563,7 @@ function Avatar({
   return (
     <span
       className={cn(
-        "flex shrink-0 items-center justify-center rounded-full border border-border bg-white font-bold text-primary",
+        "flex shrink-0 items-center justify-center rounded-full border border-border bg-card font-bold text-primary",
         sizeClass,
       )}
     >
@@ -584,7 +584,7 @@ function BalanceBadge({ net }: { net: number }) {
         owed ? "text-emerald-600 dark:text-emerald-400" : "text-amber-700 dark:text-amber-400",
       )}
     >
-      {owed ? "+" : "−"}
+      {owed ? "+" : "âˆ’"}
       {formatCurrency(Math.abs(net))}
     </span>
   );

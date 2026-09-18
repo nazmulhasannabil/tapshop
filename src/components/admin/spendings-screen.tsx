@@ -45,7 +45,7 @@ export function SpendingsScreen({
       <main className="space-y-3">
         <section className="rounded-2xl bg-primary p-5 text-primary-foreground shadow-lg shadow-primary/20">
           <div className="flex items-center gap-2.5">
-            <span className="flex size-9 items-center justify-center rounded-full bg-white/15">
+            <span className="flex size-9 items-center justify-center rounded-full bg-primary-foreground/15">
               <ShoppingBag className="size-4" />
             </span>
             <span className="text-xs font-medium uppercase tracking-wide text-primary-foreground/80">

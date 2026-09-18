@@ -339,6 +339,85 @@ export async function createItem(
   return toCatalogItem({ ...row, categoryName: category.name });
 }
 
+/** Update an existing catalog item the user can see. */
+export async function updateItem(
+  userId: string,
+  itemId: string,
+  input: { name: string; price: number; icon?: string | null; categoryId: string },
+): Promise<CatalogItem> {
+  const [existing] = await db
+    .select({ id: items.id })
+    .from(items)
+    .where(and(eq(items.id, itemId), eq(items.isActive, true), itemOwnedBy(userId)))
+    .limit(1);
+
+  if (!existing) {
+    throw new BillingError("ITEM_NOT_FOUND", "That item isn't available.");
+  }
+
+  const [category] = await db
+    .select({ id: categories.id, name: categories.name })
+    .from(categories)
+    .where(and(eq(categories.id, input.categoryId), catalogOwnedBy(userId)))
+    .limit(1);
+
+  if (!category) {
+    throw new BillingError("CATEGORY_NOT_FOUND", "Pick a category.");
+  }
+
+  const [row] = await db
+    .update(items)
+    .set({
+      name: input.name,
+      price: input.price.toFixed(2),
+      icon: input.icon ?? null,
+      categoryId: category.id,
+      updatedAt: new Date(),
+    })
+    .where(eq(items.id, itemId))
+    .returning({
+      id: items.id,
+      name: items.name,
+      price: items.price,
+      icon: items.icon,
+      categoryId: items.categoryId,
+    });
+
+  await db.insert(activityLogs).values({
+    actorId: userId,
+    entityType: ENTITY_TYPE.ITEM,
+    entityId: row.id,
+    action: ACTION.USER_UPDATED_ITEM,
+  });
+
+  return toCatalogItem({ ...row, categoryName: category.name });
+}
+
+/** Soft-delete a catalog item (keeps historical bill lines intact). */
+export async function deleteItem(userId: string, itemId: string): Promise<void> {
+  const [existing] = await db
+    .select({ id: items.id })
+    .from(items)
+    .where(and(eq(items.id, itemId), eq(items.isActive, true), itemOwnedBy(userId)))
+    .limit(1);
+
+  if (!existing) {
+    throw new BillingError("ITEM_NOT_FOUND", "That item isn't available.");
+  }
+
+  await db
+    .update(items)
+    .set({ isActive: false, updatedAt: new Date() })
+    .where(eq(items.id, itemId));
+
+  await db.insert(activityLogs).values({
+    actorId: userId,
+    entityType: ENTITY_TYPE.ITEM,
+    entityId: itemId,
+    action: ACTION.USER_DELETED_ITEM,
+  });
+}
+
 /** Typed service error so route handlers can map to HTTP statuses cleanly. */
 export class BillingError extends Error {
   code: string;

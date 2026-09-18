@@ -9,7 +9,7 @@ type FilterChipsProps = {
   className?: string;
 };
 
-/** Horizontal filter chip group with indigo active state. */
+/** Horizontal filter chip group — emerald active, dark inactive (Figma). */
 export function FilterChips({
   options,
   active,
@@ -24,10 +24,10 @@ export function FilterChips({
           type="button"
           onClick={() => onChange(option)}
           className={cn(
-            "shrink-0 rounded-full px-4 py-1.5 text-xs font-semibold transition-colors",
+            "shrink-0 rounded-lg px-3 py-1 text-xs font-medium transition-colors",
             active === option
-              ? "bg-primary text-primary-foreground"
-              : "bg-accent text-foreground hover:bg-accent/80",
+              ? "bg-primary font-bold text-primary-foreground shadow-sm"
+              : "border border-border bg-card text-slate-300 hover:text-white",
           )}
         >
           {option}

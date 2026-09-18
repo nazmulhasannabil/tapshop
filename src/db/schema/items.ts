@@ -20,7 +20,7 @@ export const items = pgTable(
       .$defaultFn(() => crypto.randomUUID()),
     name: text("name").notNull(),
     price: numeric("price", { precision: 12, scale: 2 }).notNull(),
-    /** Optional emoji/short identifier for fast visual scanning. */
+    /** Optional emoji or public image path (e.g. `/items/tea.webp`). */
     icon: text("icon"),
     /** Required category for Home filtering. */
     categoryId: text("category_id")

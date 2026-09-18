@@ -27,6 +27,7 @@ import {
 import { authClient } from "@/lib/auth/client";
 import type { MostUsed } from "@/lib/services/stats";
 import { cn } from "@/lib/utils";
+import { ItemVisual } from "@/components/billing/item-visual";
 
 type SettingsRow = {
   icon: LucideIcon;
@@ -88,7 +89,7 @@ export function ProfileView({
   // next-themes resolves the theme in a post-mount effect, so `resolvedTheme`
   // is undefined during both SSR and the hydration render (both fall back to
   // "light") — no hydration mismatch.
-  const themeLabel = resolvedTheme ?? "light";
+  const themeLabel = resolvedTheme ?? "dark";
 
   async function handleLogout() {
     setPending(true);
@@ -252,8 +253,13 @@ export function ProfileView({
               Favorite Item
             </p>
             <div className="mt-3 flex items-center gap-2">
-              <span className="text-2xl leading-none">
-                {favoriteItem?.icon ?? "☕"}
+              <span className="relative flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-accent text-2xl leading-none">
+                <ItemVisual
+                  icon={favoriteItem?.icon}
+                  name={favoriteItem?.name}
+                  className="absolute inset-0"
+                  emojiClassName="relative flex size-full items-center justify-center text-2xl"
+                />
               </span>
               <span className="font-semibold text-foreground">
                 {favoriteItem?.name ?? "—"}
@@ -432,7 +438,7 @@ export function ProfileView({
                 Appearance
               </h3>
               <p className="mt-1 text-sm text-muted-foreground">
-                Choose how TapShop looks to you.
+                Choose how Money Back looks to you.
               </p>
               <div className="mt-4 space-y-2">
                 {(
@@ -506,7 +512,7 @@ export function ProfileView({
               </h3>
               <p className="mt-1 text-sm text-muted-foreground">
                 Have a question about your orders, account, or payments? Our
-                team is here to help you get the most out of TapShop.
+                team is here to help you get the most out of Money Back.
               </p>
 
               {/* WhatsApp number */}

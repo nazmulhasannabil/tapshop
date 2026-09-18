@@ -4,7 +4,7 @@ import {
 } from "@/lib/services/admin";
 import { DashboardScreen } from "@/components/admin/dashboard-screen";
 
-export const metadata = { title: "Dashboard — TapShop Admin" };
+export const metadata = { title: "Dashboard — Money Back Admin" };
 
 export default async function DashboardPage({
   searchParams,
