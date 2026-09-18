@@ -1,9 +1,7 @@
-import { getActiveTodayUsers } from "@/lib/services/admin";
-import { ActiveTodayScreen } from "@/components/admin/active-today-screen";
+import { redirect } from "next/navigation";
 
 export const metadata = { title: "Active Today — TapShop Admin" };
 
-export default async function ActiveTodayPage() {
-  const users = await getActiveTodayUsers();
-  return <ActiveTodayScreen users={users} />;
+export default function ActiveTodayPage() {
+  redirect("/dashboard/spendings?period=today");
 }

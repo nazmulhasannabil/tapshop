@@ -12,9 +12,11 @@ type StatCardProps = {
   /** Optional route — when provided the card renders as a clickable link. */
   href?: string;
   className?: string;
+  /** Renders as a list row without its own card chrome. */
+  embedded?: boolean;
 };
 
-/** Compact stat card with icon, optional badge, label, and large value. */
+/** Compact stat card: icon on the left, label/value on the right. */
 export function StatCard({
   icon,
   label,
@@ -23,50 +25,71 @@ export function StatCard({
   variant = "default",
   href,
   className,
+  embedded = false,
 }: StatCardProps) {
+  const isPrimary = variant === "primary" && !embedded;
+
   const content = (
     <>
-      <div className="flex items-center justify-between">
+      {badge && (
+        <div className="absolute right-0 top-0 z-10 -translate-y-1/3 translate-x-1/4">
+          {badge}
+        </div>
+      )}
+      <div className="flex items-center gap-3">
         <span
           className={cn(
-            "flex size-9 items-center justify-center rounded-full",
-            variant === "primary"
+            "flex size-11 shrink-0 items-center justify-center rounded-full",
+            isPrimary
               ? "bg-white/15"
-              : "bg-accent text-foreground",
+              : embedded && variant === "primary"
+                ? "bg-primary text-primary-foreground"
+                : "bg-accent text-foreground",
           )}
         >
           {icon}
         </span>
-        {badge && <div>{badge}</div>}
+        <div className="min-w-0 flex-1">
+          <p
+            className={cn(
+              "text-[11px] font-semibold uppercase tracking-wide",
+              isPrimary
+                ? "text-primary-foreground/80"
+                : "text-muted-foreground",
+            )}
+          >
+            {label}
+          </p>
+          <p
+            className={cn(
+              "mt-0.5 text-2xl font-bold tracking-tight tnum",
+              !isPrimary && "text-foreground",
+            )}
+          >
+            {value}
+          </p>
+        </div>
       </div>
-      <p
-        className={cn(
-          "mt-3 text-[11px] font-semibold uppercase tracking-wide",
-          variant === "primary"
-            ? "text-primary-foreground/80"
-            : "text-muted-foreground",
-        )}
-      >
-        {label}
-      </p>
-      <p className="mt-0.5 text-2xl font-bold tracking-tight tnum">
-        {value}
-      </p>
     </>
   );
 
   const classes = cn(
-    "rounded-2xl p-4 shadow-sm transition-shadow active:shadow-md",
-    variant === "primary"
-      ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20"
-      : "bg-card ring-1 ring-border",
-    href && "cursor-pointer transition-transform hover:scale-[1.02]",
+    "relative",
+    embedded
+      ? "block px-4 py-3 transition-colors hover:bg-accent/50 active:bg-accent"
+      : cn(
+          "rounded-2xl p-4 shadow-sm transition-shadow active:shadow-md",
+          isPrimary
+            ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20"
+            : "bg-card ring-1 ring-border",
+          href && "cursor-pointer transition-transform hover:scale-[1.02]",
+        ),
     className,
   );
 
   if (href) {
     return (
-      <Link href={href} className={cn(classes, "block")}>
+      <Link href={href} className={cn(classes, !embedded && "block")}>
         {content}
       </Link>
     );

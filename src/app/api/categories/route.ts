@@ -3,12 +3,12 @@ import { CategoryError, createCategory, getCategories } from "@/lib/services/cat
 import { getSession } from "@/lib/auth/server";
 import { fail, ok, parseJson } from "@/lib/api/http";
 
-/** GET /api/categories — list all categories for the Add Item dropdown / filters. */
+/** GET /api/categories — list categories visible to the current user. */
 export async function GET() {
   const session = await getSession();
   if (!session?.user) return fail("Unauthorized.", 401);
 
-  const list = await getCategories();
+  const list = await getCategories(session.user.id);
   return ok(list);
 }
 

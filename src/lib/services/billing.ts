@@ -1,10 +1,10 @@
 import { cache } from "react";
-import { and, asc, desc, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq, or, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { activityLogs, billEntries, categories, items } from "@/db/schema";
+import { activityLogs, billEntries, categories, items, SYSTEM_USER_ID } from "@/db/schema";
 import { ACTION, ENTITY_TYPE } from "@/db/schema";
 import { sqlAppToday } from "@/lib/timezone-sql";
-import { ensureDefaultCategories } from "@/lib/services/categories";
+import { catalogOwnedBy, ensureDefaultCategories } from "@/lib/services/categories";
 import type {
   ActivityEntry,
   AddItemResult,
@@ -12,6 +12,11 @@ import type {
   CatalogItem,
   DecreaseItemResult,
 } from "@/types/bill";
+
+/** Shared system items + rows owned by this user. */
+function itemOwnedBy(userId: string) {
+  return or(eq(items.createdBy, userId), eq(items.createdBy, SYSTEM_USER_ID));
+}
 
 /** Numeric columns come back as strings from Drizzle; coerce for the client. */
 const num = (v: string | number): number => Number(v);
@@ -45,14 +50,16 @@ const catalogSelect = {
 
 /* --------------------------------- Reads ---------------------------------- */
 
-/** All active items, alphabetically (the "All Items" grid). */
-export const getActiveItems = cache(async function getActiveItems(): Promise<CatalogItem[]> {
+/** Active items visible to the user: system defaults + their own. */
+export const getActiveItems = cache(async function getActiveItems(
+  userId: string,
+): Promise<CatalogItem[]> {
   await ensureDefaultCategories();
   const rows = await db
     .select(catalogSelect)
     .from(items)
     .innerJoin(categories, eq(items.categoryId, categories.id))
-    .where(eq(items.isActive, true))
+    .where(and(eq(items.isActive, true), itemOwnedBy(userId)))
     .orderBy(asc(items.name));
 
   return rows.map(toCatalogItem);
@@ -189,7 +196,7 @@ export async function addItemToBill(
   const item = await db
     .select({ price: items.price })
     .from(items)
-    .where(and(eq(items.id, itemId), eq(items.isActive, true)))
+    .where(and(eq(items.id, itemId), eq(items.isActive, true), itemOwnedBy(userId)))
     .limit(1);
   if (item.length === 0) {
     throw new BillingError("ITEM_NOT_FOUND", "We couldn't find that item.");
@@ -297,7 +304,7 @@ export async function createItem(
   const [category] = await db
     .select({ id: categories.id, name: categories.name })
     .from(categories)
-    .where(eq(categories.id, input.categoryId))
+    .where(and(eq(categories.id, input.categoryId), catalogOwnedBy(userId)))
     .limit(1);
 
   if (!category) {

@@ -1,8 +1,7 @@
 import { cache } from "react";
-import { and, asc, count, desc, eq, ne, sql } from "drizzle-orm";
+import { and, asc, desc, eq, ne, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { users, billEntries, items, activityLogs } from "@/db/schema";
-import { formatRelativeTime } from "@/lib/constants";
+import { users, billEntries, items, savedBills } from "@/db/schema";
 import {
   APP_TIMEZONE,
   ymdInAppTimezone,
@@ -12,14 +11,13 @@ import {
   sqlAppToday,
 } from "@/lib/timezone-sql";
 import type {
-  AdminStats,
   AdminUser,
   AdminTransaction,
-  RecentActivity,
-  WeeklyData,
-  TodayUserSpend,
-  MonthUserSpend,
-  ActiveTodayUser,
+  DashboardPeriodInput,
+  ResolvedPeriod,
+  PeriodSummary,
+  DailyPoint,
+  PeriodUserSpend,
 } from "@/components/admin/types";
 
 /** Numeric columns come back as strings from Drizzle; coerce for the client. */
@@ -27,118 +25,21 @@ const num = (v: string | number | null | undefined): number =>
   Number(v ?? 0);
 
 const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
+const YMD_RE = /^\d{4}-\d{2}-\d{2}$/;
 
-/** Actions that represent a user purchase. */
-const PURCHASE_ACTIONS = [
-  "user_added_item",
-  "user_added_quantity",
-] as const;
-
-/** Actions that represent an admin action. */
-const ADMIN_ACTIONS = [
-  "admin_corrected_entry",
-  "admin_deleted_entry",
-  "admin_changed_item",
-] as const;
-
-// ---------------------------------------------------------------------------
-// Dashboard
-// ---------------------------------------------------------------------------
-
-export type AdminDashboardData = {
-  stats: AdminStats;
-  weekly: WeeklyData;
-  activity: RecentActivity[];
+type DayAgg = { spend: number; taps: number };
+type UserAgg = {
+  spend: number;
+  taps: number;
+  lastAt: string | null;
+  name: string;
+  email: string;
+  image: string | null;
 };
 
-/**
- * Gather every figure the admin Dashboard screen needs — summary stats,
- * weekly consumption chart, and recent activity feed — in a single parallel
- * batch of queries.
- */
-export async function getAdminDashboard(): Promise<AdminDashboardData> {
-  const [stats, weekly, activity] = await Promise.all([
-    getAdminStats(),
-    getAdminWeekly(),
-    getRecentActivity(),
-  ]);
-  return { stats, weekly, activity };
-}
-
-async function getAdminStats(): Promise<AdminStats> {
-  const [
-    totalRows,
-    newThisWeekRows,
-    todaySpendRows,
-    monthSpendRows,
-    activeRows,
-  ] = await Promise.all([
-    // Total non-admin users
-    db
-      .select({ value: count() })
-      .from(users)
-      .where(ne(users.role, "admin")),
-
-    // New users this week (for growth badge)
-    db
-      .select({ value: count() })
-      .from(users)
-      .where(
-        and(
-          ne(users.role, "admin"),
-          sql`${users.createdAt} >= ${sqlAppDateTrunc("week")}`,
-        ),
-      ),
-
-    // Total spend today (all users)
-    db
-      .select({ total: sql<string>`coalesce(sum(${billEntries.subtotal}), 0)` })
-      .from(billEntries)
-      .where(eq(billEntries.billDate, sqlAppToday())),
-
-    // Total spend this month (all users)
-    db
-      .select({ total: sql<string>`coalesce(sum(${billEntries.subtotal}), 0)` })
-      .from(billEntries)
-      .where(
-        sql`${billEntries.billDate} >= ${sqlAppDateTrunc("month")}`,
-      ),
-
-    // Distinct active users today
-    db
-      .select({ value: sql<string>`count(distinct ${billEntries.userId})` })
-      .from(billEntries)
-      .where(eq(billEntries.billDate, sqlAppToday())),
-  ]);
-
-  const totalUsers = num(totalRows[0]?.value);
-  const newThisWeek = num(newThisWeekRows[0]?.value);
-  const growth =
-    newThisWeek > 0
-      ? `+${newThisWeek} this week`
-      : "No new this week";
-
-  return {
-    totalUsers,
-    totalUsersGrowth: growth,
-    todaySpend: num(todaySpendRows[0]?.total),
-    monthSpend: num(monthSpendRows[0]?.total),
-    activeToday: num(activeRows[0]?.value),
-  };
-}
-
-/** Monday YYYY-MM-DD of the current week in the app timezone. */
-function startOfWeekYmd(): string {
-  const today = ymdInAppTimezone();
-  const [y, m, d] = today.split("-").map(Number);
-  const dow = new Date(Date.UTC(y, m - 1, d)).getUTCDay(); // 0=Sun
-  const sinceMon = (dow + 6) % 7;
-  const monday = new Date(Date.UTC(y, m - 1, d - sinceMon));
-  const yy = monday.getUTCFullYear();
-  const mm = String(monday.getUTCMonth() + 1).padStart(2, "0");
-  const dd = String(monday.getUTCDate()).padStart(2, "0");
-  return `${yy}-${mm}-${dd}`;
-}
+// ---------------------------------------------------------------------------
+// Period helpers
+// ---------------------------------------------------------------------------
 
 /** Add `days` to a `YYYY-MM-DD` string in UTC calendar space (no TZ shift). */
 function addDaysYmd(ymd: string, days: number): string {
@@ -150,136 +51,382 @@ function addDaysYmd(ymd: string, days: number): string {
   return `${yy}-${mm}-${dd}`;
 }
 
-/** Mon–Sun spending totals for the current week (zeros for empty days). */
-async function getAdminWeekly(): Promise<WeeklyData> {
-  const mondayStr = startOfWeekYmd();
-
-  const skeleton = DAY_LABELS.map((label, i) => ({
-    label,
-    key: addDaysYmd(mondayStr, i),
-    value: 0,
-  }));
-
-  const rows = await db
-    .select({
-      billDate: billEntries.billDate,
-      total: sql<string>`coalesce(sum(${billEntries.subtotal}), 0)`,
-    })
-    .from(billEntries)
-    .where(sql`${billEntries.billDate} >= ${mondayStr}`)
-    .groupBy(billEntries.billDate)
-    .orderBy(asc(billEntries.billDate));
-
-  const byKey = new Map(rows.map((r) => [r.billDate, num(r.total)]));
-  return skeleton.map((d) => ({ day: d.label, value: byKey.get(d.key) ?? 0 }));
+/** Monday YYYY-MM-DD of the week containing `ymd` (ISO, matches Postgres week trunc). */
+function startOfWeekYmd(ymd: string): string {
+  const [y, m, d] = ymd.split("-").map(Number);
+  const dow = new Date(Date.UTC(y, m - 1, d)).getUTCDay(); // 0=Sun
+  const sinceMon = (dow + 6) % 7;
+  return addDaysYmd(ymd, -sinceMon);
 }
 
-/** Recent activity feed — combines activity logs + new user registrations. */
-async function getRecentActivity(): Promise<RecentActivity[]> {
-  // Independent queries — run in parallel.
-  const [logRows, newUsers] = await Promise.all([
+function startOfMonthYmd(ymd: string): string {
+  return `${ymd.slice(0, 7)}-01`;
+}
+
+function daysInMonth(ymd: string): number {
+  const [y, m] = ymd.split("-").map(Number);
+  return new Date(Date.UTC(y, m, 0)).getUTCDate();
+}
+
+function formatPeriodDayLabel(ymd: string): string {
+  const [y, m, d] = ymd.split("-").map(Number);
+  const date = new Date(Date.UTC(y, m - 1, d));
+  return date.toLocaleDateString("en-US", {
+    timeZone: "UTC",
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
+}
+
+/**
+ * Parse dashboard period from URL search params.
+ * Invalid or missing values fall back to `today`.
+ */
+export function parseDashboardPeriod(params: {
+  period?: string | string[];
+  date?: string | string[];
+}): DashboardPeriodInput {
+  const rawPeriod = Array.isArray(params.period)
+    ? params.period[0]
+    : params.period;
+  const rawDate = Array.isArray(params.date) ? params.date[0] : params.date;
+
+  if (rawDate && YMD_RE.test(rawDate)) {
+    return { kind: "date", date: rawDate };
+  }
+
+  if (rawPeriod === "week" || rawPeriod === "month" || rawPeriod === "today") {
+    return { kind: rawPeriod };
+  }
+
+  return { kind: "today" };
+}
+
+/** Resolve a period input to an inclusive app-timezone date range. */
+export function resolvePeriod(
+  input: DashboardPeriodInput = { kind: "today" },
+): ResolvedPeriod {
+  const today = ymdInAppTimezone();
+
+  if (input.kind === "date" && input.date && YMD_RE.test(input.date)) {
+    return {
+      kind: "date",
+      startDate: input.date,
+      endDate: input.date,
+      label: formatPeriodDayLabel(input.date),
+    };
+  }
+
+  if (input.kind === "week") {
+    const start = startOfWeekYmd(today);
+    return {
+      kind: "week",
+      startDate: start,
+      endDate: addDaysYmd(start, 6),
+      label: "This week",
+    };
+  }
+
+  if (input.kind === "month") {
+    const start = startOfMonthYmd(today);
+    const end = addDaysYmd(start, daysInMonth(today) - 1);
+    return {
+      kind: "month",
+      startDate: start,
+      endDate: end,
+      label: "This month",
+    };
+  }
+
+  return {
+    kind: "today",
+    startDate: today,
+    endDate: today,
+    label: "Today",
+  };
+}
+
+function mergeDay(
+  map: Map<string, DayAgg>,
+  billDate: string,
+  spend: number,
+  taps: number,
+) {
+  const prev = map.get(billDate) ?? { spend: 0, taps: 0 };
+  map.set(billDate, {
+    spend: prev.spend + spend,
+    taps: prev.taps + taps,
+  });
+}
+
+function laterIso(a: string | null, b: string | null): string | null {
+  if (!a) return b;
+  if (!b) return a;
+  return a >= b ? a : b;
+}
+
+/**
+ * Load open bill_entries + saved_bills day aggregates for a date range,
+ * then merge (same truth as user stats — saves must not erase spend).
+ */
+async function loadCombinedDayMap(
+  startDate: string,
+  endDate: string,
+): Promise<Map<string, DayAgg>> {
+  const [openRows, savedRows] = await Promise.all([
     db
       .select({
-        id: activityLogs.id,
-        actorName: users.name,
-        action: activityLogs.action,
-        newValue: activityLogs.newValue,
-        createdAt: activityLogs.createdAt,
+        billDate: billEntries.billDate,
+        total: sql<string>`coalesce(sum(${billEntries.subtotal}), 0)`,
+        taps: sql<string>`coalesce(sum(${billEntries.quantity}), 0)`,
       })
-      .from(activityLogs)
-      .innerJoin(users, eq(activityLogs.actorId, users.id))
-      .where(
-        sql`${activityLogs.createdAt} >= NOW() - INTERVAL '7 days'`,
-      )
-      .orderBy(desc(activityLogs.createdAt))
-      .limit(10),
-    db
-      .select({
-        id: users.id,
-        name: users.name,
-        createdAt: users.createdAt,
-      })
-      .from(users)
+      .from(billEntries)
       .where(
         and(
-          ne(users.role, "admin"),
-          sql`${users.createdAt} >= NOW() - INTERVAL '7 days'`,
+          sql`${billEntries.billDate} >= ${startDate}`,
+          sql`${billEntries.billDate} <= ${endDate}`,
         ),
       )
-      .orderBy(desc(users.createdAt))
-      .limit(5),
+      .groupBy(billEntries.billDate),
+    db
+      .select({
+        billDate: savedBills.billDate,
+        total: sql<string>`coalesce(sum(${savedBills.total}), 0)`,
+        taps: sql<string>`coalesce(sum(${savedBills.itemCount}), 0)`,
+      })
+      .from(savedBills)
+      .where(
+        and(
+          sql`${savedBills.billDate} >= ${startDate}`,
+          sql`${savedBills.billDate} <= ${endDate}`,
+        ),
+      )
+      .groupBy(savedBills.billDate),
   ]);
 
-  // Map activity logs
-  const logActivity: RecentActivity[] = logRows.map((row) => {
-    const isPurchase = PURCHASE_ACTIONS.includes(
-      row.action as (typeof PURCHASE_ACTIONS)[number],
-    );
-    const isAdmin = ADMIN_ACTIONS.includes(
-      row.action as (typeof ADMIN_ACTIONS)[number],
-    );
-
-    const type: RecentActivity["type"] = isPurchase
-      ? "purchase"
-      : isAdmin
-        ? "admin"
-        : "purchase";
-
-    // Build human-readable title from action + new value
-    const title = formatActionTitle(row.action, row.newValue as Record<string, unknown> | null, row.actorName);
-
-    return {
-      id: row.id,
-      type,
-      title,
-      subtitle: formatRelativeTime(row.createdAt),
-    };
-  });
-
-  // Map new users as "user_join" activities
-  const userActivity: RecentActivity[] = newUsers.map((u) => ({
-    id: `join-${u.id}`,
-    type: "user_join" as const,
-    title: `${u.name} joined TapShop`,
-    subtitle: formatRelativeTime(u.createdAt),
-  }));
-
-  // Merge, sort by most recent, take top 10
-  const all = [...logActivity, ...userActivity].slice(0, 10);
-  return all;
+  const combined = new Map<string, DayAgg>();
+  for (const r of openRows) {
+    mergeDay(combined, r.billDate, num(r.total), num(r.taps));
+  }
+  for (const r of savedRows) {
+    mergeDay(combined, r.billDate, num(r.total), num(r.taps));
+  }
+  return combined;
 }
 
-/** Build a human-readable title from an activity log action. */
-function formatActionTitle(
-  action: string,
-  newValue: Record<string, unknown> | null,
-  actorName: string,
-): string {
-  const itemName =
-    newValue && typeof newValue === "object" && "name" in newValue
-      ? String(newValue.name)
-      : null;
+// ---------------------------------------------------------------------------
+// Dashboard
+// ---------------------------------------------------------------------------
 
-  switch (action) {
-    case "user_added_item":
-      return itemName ? `${actorName} purchased ${itemName}` : `${actorName} made a purchase`;
-    case "user_added_quantity":
-      return itemName ? `${actorName} added ${itemName}` : `${actorName} tapped an item`;
-    case "user_decreased_quantity":
-      return itemName ? `${actorName} decreased ${itemName}` : `${actorName} decreased an item`;
-    case "user_removed_entry":
-      return `${actorName} removed an entry`;
-    case "user_created_item":
-      return itemName ? `${actorName} created ${itemName}` : `${actorName} created a new item`;
-    case "admin_corrected_entry":
-      return `${actorName} corrected an entry`;
-    case "admin_deleted_entry":
-      return `${actorName} deleted an entry`;
-    case "admin_changed_item":
-      return itemName ? `${actorName} updated ${itemName}` : `${actorName} updated an item`;
-    default:
-      return `${actorName} performed an action`;
+export type AdminDashboardData = {
+  period: ResolvedPeriod;
+  summary: PeriodSummary;
+  daily: DailyPoint[];
+  /** Preview list (capped) for the home screen. */
+  spenders: PeriodUserSpend[];
+  /** True when more spenders exist beyond the preview. */
+  hasMoreSpenders: boolean;
+};
+
+const HOME_SPENDER_PREVIEW = 8;
+
+/**
+ * Gather every figure the admin Dashboard needs for a selected period —
+ * summary KPIs, daily series, and top spenders — including saved bills.
+ */
+export async function getAdminDashboard(
+  input: DashboardPeriodInput = { kind: "today" },
+): Promise<AdminDashboardData> {
+  const period = resolvePeriod(input);
+  const [dayMap, allSpenders] = await Promise.all([
+    loadCombinedDayMap(period.startDate, period.endDate),
+    getPeriodUserSpend(period),
+  ]);
+
+  let totalSpend = 0;
+  for (const agg of dayMap.values()) totalSpend += agg.spend;
+
+  return {
+    period,
+    summary: {
+      totalSpend,
+      activeUsers: allSpenders.length,
+    },
+    daily: buildDailySeries(period, dayMap),
+    spenders: allSpenders.slice(0, HOME_SPENDER_PREVIEW),
+    hasMoreSpenders: allSpenders.length > HOME_SPENDER_PREVIEW,
+  };
+}
+
+/** Total spend + distinct active users for a resolved period. */
+export async function getPeriodSpendSummary(
+  period: ResolvedPeriod,
+): Promise<PeriodSummary> {
+  const spenders = await getPeriodUserSpend(period);
+  return {
+    totalSpend: spenders.reduce((sum, u) => sum + u.totalSpend, 0),
+    activeUsers: spenders.length,
+  };
+}
+
+function buildDailySeries(
+  period: ResolvedPeriod,
+  dayMap: Map<string, DayAgg>,
+): DailyPoint[] {
+  if (period.kind === "today" || period.kind === "date") {
+    return [];
   }
+
+  if (period.kind === "week") {
+    return DAY_LABELS.map((label, i) => {
+      const date = addDaysYmd(period.startDate, i);
+      return { day: label, date, value: dayMap.get(date)?.spend ?? 0 };
+    });
+  }
+
+  const [ys, ms, ds] = period.startDate.split("-").map(Number);
+  const [ye, me, de] = period.endDate.split("-").map(Number);
+  const dayCount =
+    Math.round(
+      (Date.UTC(ye, me - 1, de) - Date.UTC(ys, ms - 1, ds)) / 86_400_000,
+    ) + 1;
+
+  return Array.from({ length: dayCount }, (_, i) => {
+    const date = addDaysYmd(period.startDate, i);
+    const dayNum = String(Number(date.slice(8, 10)));
+    return { day: dayNum, date, value: dayMap.get(date)?.spend ?? 0 };
+  });
+}
+
+/** One bar per day in the period (empty for single-day — UI skips the chart). */
+export async function getPeriodDailySeries(
+  period: ResolvedPeriod,
+): Promise<DailyPoint[]> {
+  if (period.kind === "today" || period.kind === "date") {
+    return [];
+  }
+  const dayMap = await loadCombinedDayMap(period.startDate, period.endDate);
+  return buildDailySeries(period, dayMap);
+}
+
+/**
+ * Per-user spend for a period (open lines + saved snapshots), ranked by spend.
+ */
+export async function getPeriodUserSpend(
+  period: ResolvedPeriod,
+): Promise<PeriodUserSpend[]> {
+  const { startDate, endDate } = period;
+
+  const [openRows, savedRows] = await Promise.all([
+    db
+      .select({
+        userId: billEntries.userId,
+        name: users.name,
+        email: users.email,
+        image: users.image,
+        total: sql<string>`coalesce(sum(${billEntries.subtotal}), 0)`,
+        taps: sql<string>`coalesce(sum(${billEntries.quantity}), 0)`,
+        lastAt: sql<string>`max(${billEntries.consumedAt})`,
+      })
+      .from(billEntries)
+      .innerJoin(users, eq(billEntries.userId, users.id))
+      .where(
+        and(
+          sql`${billEntries.billDate} >= ${startDate}`,
+          sql`${billEntries.billDate} <= ${endDate}`,
+        ),
+      )
+      .groupBy(billEntries.userId, users.id),
+    db
+      .select({
+        userId: savedBills.userId,
+        name: users.name,
+        email: users.email,
+        image: users.image,
+        total: sql<string>`coalesce(sum(${savedBills.total}), 0)`,
+        taps: sql<string>`coalesce(sum(${savedBills.itemCount}), 0)`,
+        lastAt: sql<string>`max(${savedBills.createdAt})`,
+      })
+      .from(savedBills)
+      .innerJoin(users, eq(savedBills.userId, users.id))
+      .where(
+        and(
+          sql`${savedBills.billDate} >= ${startDate}`,
+          sql`${savedBills.billDate} <= ${endDate}`,
+        ),
+      )
+      .groupBy(savedBills.userId, users.id),
+  ]);
+
+  const byUser = new Map<string, UserAgg>();
+
+  for (const r of openRows) {
+    byUser.set(r.userId, {
+      spend: num(r.total),
+      taps: num(r.taps),
+      lastAt: r.lastAt ? String(r.lastAt) : null,
+      name: r.name,
+      email: r.email,
+      image: r.image,
+    });
+  }
+
+  for (const r of savedRows) {
+    const prev = byUser.get(r.userId);
+    if (!prev) {
+      byUser.set(r.userId, {
+        spend: num(r.total),
+        taps: num(r.taps),
+        lastAt: r.lastAt ? String(r.lastAt) : null,
+        name: r.name,
+        email: r.email,
+        image: r.image,
+      });
+      continue;
+    }
+    prev.spend += num(r.total);
+    prev.taps += num(r.taps);
+    prev.lastAt = laterIso(prev.lastAt, r.lastAt ? String(r.lastAt) : null);
+  }
+
+  const totalSpend = [...byUser.values()].reduce((s, u) => s + u.spend, 0);
+
+  return [...byUser.entries()]
+    .map(([id, u]) => ({
+      id,
+      name: u.name,
+      email: u.email,
+      image: u.image ?? undefined,
+      totalSpend: u.spend,
+      tapCount: u.taps,
+      percentage:
+        totalSpend > 0 ? Math.round((u.spend / totalSpend) * 100) : 0,
+      lastActivityAt: u.lastAt,
+    }))
+    .sort((a, b) => b.totalSpend - a.totalSpend);
+}
+
+export type SpendingsPageData = {
+  period: ResolvedPeriod;
+  summary: PeriodSummary;
+  spenders: PeriodUserSpend[];
+};
+
+/** Full spenders list for `/dashboard/spendings`. */
+export async function getSpendingsPageData(
+  input: DashboardPeriodInput = { kind: "today" },
+): Promise<SpendingsPageData> {
+  const period = resolvePeriod(input);
+  const spenders = await getPeriodUserSpend(period);
+  return {
+    period,
+    summary: {
+      totalSpend: spenders.reduce((sum, u) => sum + u.totalSpend, 0),
+      activeUsers: spenders.length,
+    },
+    spenders,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -307,50 +454,80 @@ export async function getAdminUsers(): Promise<AdminUser[]> {
 
   if (allUsers.length === 0) return [];
 
-  // Batch aggregations grouped by userId
-  const [
-    todayRows,
-    totalRows,
-    monthRows,
-  ] = await Promise.all([
-    // Today's spend per user
-    db
-      .select({
-        userId: billEntries.userId,
-        todayBill: sql<string>`coalesce(sum(${billEntries.subtotal}), 0)`,
-      })
-      .from(billEntries)
-      .where(eq(billEntries.billDate, sqlAppToday()))
-      .groupBy(billEntries.userId),
+  const [todayRows, totalRows, monthRows] = await Promise.all([
+    db.execute(sql`
+      select user_id, coalesce(sum(amount), 0) as today_bill
+      from (
+        select ${billEntries.userId} as user_id, ${billEntries.subtotal} as amount
+        from ${billEntries}
+        where ${billEntries.billDate} = ${sqlAppToday()}
 
-    // Lifetime totals per user
-    db
-      .select({
-        userId: billEntries.userId,
-        totalSpent: sql<string>`coalesce(sum(${billEntries.subtotal}), 0)`,
-        totalItems: sql<string>`coalesce(sum(${billEntries.quantity}), 0)`,
-      })
-      .from(billEntries)
-      .groupBy(billEntries.userId),
+        union all
 
-    // This month per user
-    db
-      .select({
-        userId: billEntries.userId,
-        monthSpend: sql<string>`coalesce(sum(${billEntries.subtotal}), 0)`,
-      })
-      .from(billEntries)
-      .where(
-        sql`${billEntries.billDate} >= ${sqlAppDateTrunc("month")}`,
-      )
-      .groupBy(billEntries.userId),
+        select ${savedBills.userId} as user_id, ${savedBills.total} as amount
+        from ${savedBills}
+        where ${savedBills.billDate} = ${sqlAppToday()}
+      ) t
+      group by user_id
+    `),
+
+    db.execute(sql`
+      select user_id,
+             coalesce(sum(amount), 0) as total_spent,
+             coalesce(sum(qty), 0) as total_items
+      from (
+        select ${billEntries.userId} as user_id,
+               ${billEntries.subtotal} as amount,
+               ${billEntries.quantity} as qty
+        from ${billEntries}
+
+        union all
+
+        select ${savedBills.userId} as user_id,
+               ${savedBills.total} as amount,
+               ${savedBills.itemCount} as qty
+        from ${savedBills}
+      ) t
+      group by user_id
+    `),
+
+    db.execute(sql`
+      select user_id, coalesce(sum(amount), 0) as month_spend
+      from (
+        select ${billEntries.userId} as user_id, ${billEntries.subtotal} as amount
+        from ${billEntries}
+        where ${billEntries.billDate} >= ${sqlAppDateTrunc("month")}
+
+        union all
+
+        select ${savedBills.userId} as user_id, ${savedBills.total} as amount
+        from ${savedBills}
+        where ${savedBills.billDate} >= ${sqlAppDateTrunc("month")}
+      ) t
+      group by user_id
+    `),
   ]);
 
-  const todayMap = new Map(todayRows.map((r) => [r.userId, num(r.todayBill)]));
-  const totalMap = new Map(
-    totalRows.map((r) => [r.userId, { spent: num(r.totalSpent), items: num(r.totalItems) }]),
+  type AggRow = Record<string, unknown>;
+  const todayList = (todayRows as unknown as { rows: AggRow[] }).rows;
+  const totalList = (totalRows as unknown as { rows: AggRow[] }).rows;
+  const monthList = (monthRows as unknown as { rows: AggRow[] }).rows;
+
+  const todayMap = new Map(
+    todayList.map((r) => [String(r.user_id), num(r.today_bill as string)]),
   );
-  const monthMap = new Map(monthRows.map((r) => [r.userId, num(r.monthSpend)]));
+  const totalMap = new Map(
+    totalList.map((r) => [
+      String(r.user_id),
+      {
+        spent: num(r.total_spent as string),
+        items: num(r.total_items as string),
+      },
+    ]),
+  );
+  const monthMap = new Map(
+    monthList.map((r) => [String(r.user_id), num(r.month_spend as string)]),
+  );
 
   return allUsers.map((u) => {
     const total = totalMap.get(u.id) ?? { spent: 0, items: 0 };
@@ -405,38 +582,57 @@ export const getAdminUserDetails = cache(async function getAdminUserDetails(
 
   if (!userRow) return null;
 
-  const [
-    todayRows,
-    totalRows,
-    monthRows,
-    txRows,
-  ] = await Promise.all([
-    db
-      .select({ total: sql<string>`coalesce(sum(${billEntries.subtotal}), 0)` })
-      .from(billEntries)
-      .where(
-        and(eq(billEntries.userId, userId), eq(billEntries.billDate, sqlAppToday())),
-      ),
+  const [todayRows, totalRows, monthRows, txRows] = await Promise.all([
+    db.execute(sql`
+      select coalesce(sum(amount), 0) as total
+      from (
+        select ${billEntries.subtotal} as amount
+        from ${billEntries}
+        where ${billEntries.userId} = ${userId}
+          and ${billEntries.billDate} = ${sqlAppToday()}
 
-    db
-      .select({
-        totalSpent: sql<string>`coalesce(sum(${billEntries.subtotal}), 0)`,
-        totalItems: sql<string>`coalesce(sum(${billEntries.quantity}), 0)`,
-      })
-      .from(billEntries)
-      .where(eq(billEntries.userId, userId)),
+        union all
 
-    db
-      .select({ total: sql<string>`coalesce(sum(${billEntries.subtotal}), 0)` })
-      .from(billEntries)
-      .where(
-        and(
-          eq(billEntries.userId, userId),
-          sql`${billEntries.billDate} >= ${sqlAppDateTrunc("month")}`,
-        ),
-      ),
+        select ${savedBills.total} as amount
+        from ${savedBills}
+        where ${savedBills.userId} = ${userId}
+          and ${savedBills.billDate} = ${sqlAppToday()}
+      ) t
+    `),
 
-    // Recent transactions (last 20 entries, joined with items)
+    db.execute(sql`
+      select coalesce(sum(amount), 0) as total_spent,
+             coalesce(sum(qty), 0) as total_items
+      from (
+        select ${billEntries.subtotal} as amount, ${billEntries.quantity} as qty
+        from ${billEntries}
+        where ${billEntries.userId} = ${userId}
+
+        union all
+
+        select ${savedBills.total} as amount, ${savedBills.itemCount} as qty
+        from ${savedBills}
+        where ${savedBills.userId} = ${userId}
+      ) t
+    `),
+
+    db.execute(sql`
+      select coalesce(sum(amount), 0) as total
+      from (
+        select ${billEntries.subtotal} as amount
+        from ${billEntries}
+        where ${billEntries.userId} = ${userId}
+          and ${billEntries.billDate} >= ${sqlAppDateTrunc("month")}
+
+        union all
+
+        select ${savedBills.total} as amount
+        from ${savedBills}
+        where ${savedBills.userId} = ${userId}
+          and ${savedBills.billDate} >= ${sqlAppDateTrunc("month")}
+      ) t
+    `),
+
     db
       .select({
         id: billEntries.id,
@@ -453,11 +649,22 @@ export const getAdminUserDetails = cache(async function getAdminUserDetails(
       .limit(20),
   ]);
 
-  const todayBill = num(todayRows[0]?.total);
-  const total = totalRows[0]
-    ? { spent: num(totalRows[0].totalSpent), items: num(totalRows[0].totalItems) }
+  const todayList = (todayRows as unknown as { rows: { total: string }[] }).rows;
+  const totalList = (
+    totalRows as unknown as {
+      rows: { total_spent: string; total_items: string }[];
+    }
+  ).rows;
+  const monthList = (monthRows as unknown as { rows: { total: string }[] }).rows;
+
+  const todayBill = num(todayList[0]?.total);
+  const total = totalList[0]
+    ? {
+        spent: num(totalList[0].total_spent),
+        items: num(totalList[0].total_items),
+      }
     : { spent: 0, items: 0 };
-  const thisMonth = num(monthRows[0]?.total);
+  const thisMonth = num(monthList[0]?.total);
   const avgPerTap = total.items > 0 ? total.spent / total.items : 0;
 
   const user: AdminUser = {
@@ -487,123 +694,6 @@ export const getAdminUserDetails = cache(async function getAdminUserDetails(
 });
 
 // ---------------------------------------------------------------------------
-// Dashboard drill-downs
-// ---------------------------------------------------------------------------
-
-export type TodayBreakdownData = {
-  total: number;
-  users: TodayUserSpend[];
-};
-
-/**
- * Per-user today spend breakdown with tap count and last tap time.
- * Used by the "Today's Spend" drill-down page.
- */
-export async function getTodayBreakdown(): Promise<TodayBreakdownData> {
-  const rows = await db
-    .select({
-      userId: billEntries.userId,
-      name: users.name,
-      email: users.email,
-      image: users.image,
-      totalToday: sql<string>`coalesce(sum(${billEntries.subtotal}), 0)`,
-      tapCount: sql<string>`count(*)`,
-      lastTapAt: sql<string>`max(${billEntries.consumedAt})`,
-    })
-    .from(billEntries)
-    .innerJoin(users, eq(billEntries.userId, users.id))
-    .where(eq(billEntries.billDate, sqlAppToday()))
-    .groupBy(billEntries.userId, users.id)
-    .orderBy(desc(sql`sum(${billEntries.subtotal})`));
-
-  const total = rows.reduce((sum, r) => sum + num(r.totalToday), 0);
-
-  return {
-    total,
-    users: rows.map((r) => ({
-      id: r.userId,
-      name: r.name,
-      email: r.email,
-      image: r.image ?? undefined,
-      totalToday: num(r.totalToday),
-      tapCount: num(r.tapCount),
-      lastTapAt: String(r.lastTapAt),
-    })),
-  };
-}
-
-export type MonthBreakdownData = {
-  total: number;
-  users: MonthUserSpend[];
-};
-
-/**
- * Per-user month revenue breakdown with tap count and percentage.
- * Used by the "Month Revenue" drill-down page.
- */
-export async function getMonthBreakdown(): Promise<MonthBreakdownData> {
-  const rows = await db
-    .select({
-      userId: billEntries.userId,
-      name: users.name,
-      email: users.email,
-      image: users.image,
-      totalMonth: sql<string>`coalesce(sum(${billEntries.subtotal}), 0)`,
-      tapCount: sql<string>`count(*)`,
-    })
-    .from(billEntries)
-    .innerJoin(users, eq(billEntries.userId, users.id))
-    .where(sql`${billEntries.billDate} >= ${sqlAppDateTrunc("month")}`)
-    .groupBy(billEntries.userId, users.id)
-    .orderBy(desc(sql`sum(${billEntries.subtotal})`));
-
-  const total = rows.reduce((sum, r) => sum + num(r.totalMonth), 0);
-
-  return {
-    total,
-    users: rows.map((r) => ({
-      id: r.userId,
-      name: r.name,
-      email: r.email,
-      image: r.image ?? undefined,
-      totalMonth: num(r.totalMonth),
-      tapCount: num(r.tapCount),
-      percentage: total > 0 ? Math.round((num(r.totalMonth) / total) * 100) : 0,
-    })),
-  };
-}
-
-/**
- * Users active today with their today spend and last activity time.
- * Used by the "Active Today" drill-down page.
- */
-export async function getActiveTodayUsers(): Promise<ActiveTodayUser[]> {
-  const rows = await db
-    .select({
-      userId: billEntries.userId,
-      name: users.name,
-      email: users.email,
-      image: users.image,
-      todaySpend: sql<string>`coalesce(sum(${billEntries.subtotal}), 0)`,
-      lastActiveAt: sql<string>`max(${billEntries.consumedAt})`,
-    })
-    .from(billEntries)
-    .innerJoin(users, eq(billEntries.userId, users.id))
-    .where(eq(billEntries.billDate, sqlAppToday()))
-    .groupBy(billEntries.userId, users.id)
-    .orderBy(desc(sql`sum(${billEntries.subtotal})`));
-
-  return rows.map((r) => ({
-    id: r.userId,
-    name: r.name,
-    email: r.email,
-    image: r.image ?? undefined,
-    todaySpend: num(r.todaySpend),
-    lastActiveAt: String(r.lastActiveAt),
-  }));
-}
-
-// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
@@ -629,3 +719,4 @@ function formatDate(date: Date): string {
     year: "numeric",
   });
 }
+

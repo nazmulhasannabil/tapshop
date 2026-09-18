@@ -40,16 +40,16 @@ async function main() {
   const poolMax = Number(process.env.PG_POOL_MAX) || 5;
   await time(`warmup_pool_x${poolMax}`, async () => {
     await Promise.all(
-      Array.from({ length: poolMax }, () => getActiveItems()),
+      Array.from({ length: poolMax }, () => getActiveItems(userId)),
     );
   });
 
-  await time("home activeItems", () => getActiveItems());
+  await time("home activeItems", () => getActiveItems(userId));
   await time("home todayBill", () => getTodayBill(userId));
   await time("home recentItems", () => getRecentItems(userId));
   await time("home parallel3", async () => {
     await Promise.all([
-      getActiveItems(),
+      getActiveItems(userId),
       getTodayBill(userId),
       getRecentItems(userId),
     ]);

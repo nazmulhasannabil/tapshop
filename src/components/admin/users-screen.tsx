@@ -61,13 +61,15 @@ export function UsersScreen({ users }: UsersScreenProps) {
       />
 
       {/* User list */}
-      <div className="mt-4 space-y-3">
+      <div className="mt-4">
         {filtered.length > 0 ? (
-          filtered.map((user) => (
-            <Link key={user.id} href={`/users/${user.id}`}>
-              <UserCard user={user} />
-            </Link>
-          ))
+          <div>
+            {filtered.map((user) => (
+              <Link key={user.id} href={`/users/${user.id}`} className="block">
+                <UserCard user={user} />
+              </Link>
+            ))}
+          </div>
         ) : (
           <div className="flex flex-col items-center justify-center py-16 text-center">
             <span className="text-4xl">🔍</span>

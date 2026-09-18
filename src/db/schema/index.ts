@@ -22,6 +22,7 @@ import { friendships, type Friendship } from "./friendships";
 import { friendInvites, type FriendInvite } from "./friend-invites";
 import { debtEntries, type DebtEntry } from "./debt-entries";
 
+export { SYSTEM_USER_ID } from "../system";
 export {
   users,
   sessions,

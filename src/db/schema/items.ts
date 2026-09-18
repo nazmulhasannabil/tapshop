@@ -3,10 +3,11 @@ import { users } from "./auth";
 import { categories, DEFAULT_CATEGORY_IDS } from "./categories";
 
 /**
- * Shop items a user can tap.
+ * Catalog items a user can tap.
  *
- * `price` is the CURRENT price and may change over time — historical bills
- * must never be recomputed from it (see `bill_entries.unit_price` snapshot).
+ * System-owned rows (seed defaults) are shared; user-created rows are private
+ * via `createdBy`. `price` is the CURRENT price — historical bills must never
+ * be recomputed from it (see `bill_entries.unit_price` snapshot).
  *
  * `shopId` is reserved for a future multi-shop/workspace feature and is left
  * nullable so the schema won't need a rewrite later.

@@ -11,10 +11,10 @@ export default async function HomePage() {
   const session = await requireUser();
 
   const [items, todayBill, recent, categories] = await Promise.all([
-    getActiveItems(),
+    getActiveItems(session.user.id),
     getTodayBill(session.user.id),
     getRecentItems(session.user.id),
-    getCategories(),
+    getCategories(session.user.id),
   ]);
 
   return (

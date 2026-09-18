@@ -23,55 +23,44 @@ export type AdminTransaction = {
   quantity: number;
 };
 
-export type AdminStats = {
-  totalUsers: number;
-  totalUsersGrowth: string; // e.g. "+3 this week"
-  todaySpend: number;
-  monthSpend: number;
-  activeToday: number;
+/** Period kind for dashboard / spendings date scope. */
+export type DashboardPeriodKind = "today" | "week" | "month" | "date";
+
+export type DashboardPeriodInput = {
+  kind: DashboardPeriodKind;
+  /** Required when kind is `date` (YYYY-MM-DD). */
+  date?: string;
 };
 
-export type RecentActivity = {
-  id: string;
-  type: "purchase" | "admin" | "user_join";
-  title: string;
-  subtitle: string;
-  amount?: string;
+/** Resolved inclusive date range in app timezone. */
+export type ResolvedPeriod = {
+  kind: DashboardPeriodKind;
+  startDate: string;
+  endDate: string;
+  /** Human label for KPIs / headers. */
+  label: string;
 };
 
-export type WeeklyData = {
+export type PeriodSummary = {
+  totalSpend: number;
+  activeUsers: number;
+};
+
+/** One bar in the period spend chart. */
+export type DailyPoint = {
   day: string;
+  date: string;
   value: number;
-}[];
-
-/** Per-user today spend breakdown for the Today's Spend drill-down. */
-export type TodayUserSpend = {
-  id: string;
-  name: string;
-  email: string;
-  image?: string;
-  totalToday: number;
-  tapCount: number;
-  lastTapAt: string; // ISO string
 };
 
-/** Per-user month revenue breakdown for the Month Revenue drill-down. */
-export type MonthUserSpend = {
+/** Per-user spend for a selected period. */
+export type PeriodUserSpend = {
   id: string;
   name: string;
   email: string;
   image?: string;
-  totalMonth: number;
+  totalSpend: number;
   tapCount: number;
   percentage: number;
-};
-
-/** User active today for the Active Today drill-down. */
-export type ActiveTodayUser = {
-  id: string;
-  name: string;
-  email: string;
-  image?: string;
-  todaySpend: number;
-  lastActiveAt: string; // ISO string
+  lastActivityAt: string | null;
 };

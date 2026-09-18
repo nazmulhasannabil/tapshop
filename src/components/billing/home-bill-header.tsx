@@ -90,7 +90,7 @@ export function HomeBillHeader({
               aria-haspopup="dialog"
               aria-expanded={open}
               onClick={() => setOpen((v) => !v)}
-              className="relative flex size-9 items-center justify-center rounded-full bg-primary-foreground/15 text-primary-foreground transition hover:bg-primary-foreground/25 active:scale-90"
+              className="relative flex size-9 items-center justify-center text-primary-foreground transition hover:opacity-80 active:scale-90"
             >
               <Bell className="size-5" />
               {unreadCount > 0 && (

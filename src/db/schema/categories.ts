@@ -1,9 +1,10 @@
+import { sql } from "drizzle-orm";
 import { pgTable, text, timestamp, index, uniqueIndex } from "drizzle-orm/pg-core";
 import { users } from "./auth";
 
 /**
- * Shared catalog categories (Grocery, Hangout, Party, plus user-created ones).
- * Items reference a category by id for filtering on Home.
+ * Catalog categories: shared system defaults (Grocery, Hangout, Party) plus
+ * per-user private categories. Visibility is scoped by `createdBy`.
  */
 export const categories = pgTable(
   "categories",
@@ -16,7 +17,7 @@ export const categories = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
   },
   (t) => [
-    uniqueIndex("categories_name_unique_idx").on(t.name),
+    uniqueIndex("categories_owner_name_uidx").on(t.createdBy, sql`lower(${t.name})`),
     index("categories_created_at_idx").on(t.createdAt),
   ],
 );

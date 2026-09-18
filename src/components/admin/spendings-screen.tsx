@@ -1,28 +1,34 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, TrendingUp, Hash, BarChart3 } from "lucide-react";
+import { ArrowLeft, Hash, ShoppingBag, Users } from "lucide-react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
-import { formatCurrency } from "@/lib/constants";
-import type { MonthUserSpend } from "./types";
+import { formatCurrency, formatRelativeTime } from "@/lib/constants";
+import { PeriodControl } from "./period-control";
+import type {
+  PeriodSummary,
+  PeriodUserSpend,
+  ResolvedPeriod,
+} from "./types";
 
-type MonthBreakdownScreenProps = {
-  total: number;
-  users: MonthUserSpend[];
+type SpendingsScreenProps = {
+  period: ResolvedPeriod;
+  summary: PeriodSummary;
+  spenders: PeriodUserSpend[];
 };
 
-/** Month Revenue drill-down — per-user breakdown with amount and percentage. */
-export function MonthBreakdownScreen({
-  total,
-  users,
-}: MonthBreakdownScreenProps) {
+/** Full period spendings list — who spent how much in the selected range. */
+export function SpendingsScreen({
+  period,
+  summary,
+  spenders,
+}: SpendingsScreenProps) {
   const router = useRouter();
 
   return (
     <div className="mx-auto flex min-h-[100dvh] w-full max-w-md flex-col bg-background px-4 pb-24">
-      {/* Back navigation */}
       <div className="flex items-center gap-3 py-3">
         <button
           type="button"
@@ -31,41 +37,45 @@ export function MonthBreakdownScreen({
         >
           <ArrowLeft className="size-5 text-foreground" />
         </button>
-        <h1 className="text-lg font-bold text-foreground">Month Revenue</h1>
+        <h1 className="text-lg font-bold text-foreground">Spendings</h1>
       </div>
 
+      <PeriodControl period={period} base="spendings" className="pb-3" />
+
       <main className="space-y-3">
-        {/* Summary card */}
         <section className="rounded-2xl bg-primary p-5 text-primary-foreground shadow-lg shadow-primary/20">
           <div className="flex items-center gap-2.5">
             <span className="flex size-9 items-center justify-center rounded-full bg-white/15">
-              <TrendingUp className="size-4" />
+              <ShoppingBag className="size-4" />
             </span>
             <span className="text-xs font-medium uppercase tracking-wide text-primary-foreground/80">
-              This Month Total
+              {period.label}
             </span>
           </div>
           <p className="mt-3 text-3xl font-bold tracking-tight tnum">
-            {formatCurrency(total)}
+            {formatCurrency(summary.totalSpend)}
+          </p>
+          <p className="mt-1 text-sm text-primary-foreground/80">
+            {summary.activeUsers} active user
+            {summary.activeUsers !== 1 ? "s" : ""}
           </p>
         </section>
 
-        {/* User list */}
-        {users.length === 0 ? (
+        {spenders.length === 0 ? (
           <div className="flex flex-col items-center justify-center rounded-2xl bg-card py-16 ring-1 ring-border">
-            <BarChart3 className="size-10 text-muted-foreground/40" />
+            <Users className="size-10 text-muted-foreground/40" />
             <p className="mt-3 text-sm font-medium text-muted-foreground">
-              No revenue recorded this month
+              No spend in this period
             </p>
           </div>
         ) : (
           <section className="rounded-2xl bg-card px-4 pb-2 pt-4 ring-1 ring-border shadow-sm">
             <h2 className="text-base font-bold text-foreground">
-              Revenue by User
+              By person
             </h2>
             <div className="mt-2 divide-y divide-border/60">
-              {users.map((user) => (
-                <UserRow key={user.id} user={user} />
+              {spenders.map((user) => (
+                <SpenderRow key={user.id} user={user} />
               ))}
             </div>
           </section>
@@ -75,7 +85,7 @@ export function MonthBreakdownScreen({
   );
 }
 
-function UserRow({ user }: { user: MonthUserSpend }) {
+function SpenderRow({ user }: { user: PeriodUserSpend }) {
   const initials = user.name
     .split(" ")
     .map((n) => n[0])
@@ -84,7 +94,10 @@ function UserRow({ user }: { user: MonthUserSpend }) {
     .toUpperCase();
 
   return (
-    <div className="flex items-center gap-3 py-3">
+    <Link
+      href={`/users/${user.id}`}
+      className="flex items-center gap-3 py-3 transition-colors hover:bg-accent/40"
+    >
       <Avatar className="size-10">
         {user.image && <AvatarImage src={user.image} alt={user.name} />}
         <AvatarFallback className="bg-accent text-xs font-semibold text-foreground">
@@ -96,10 +109,9 @@ function UserRow({ user }: { user: MonthUserSpend }) {
           {user.name}
         </p>
         <div className="mt-1 flex items-center gap-2">
-          {/* Percentage bar */}
           <div className="h-1.5 w-20 overflow-hidden rounded-full bg-accent">
             <div
-              className="h-full rounded-full bg-primary transition-all"
+              className="h-full rounded-full bg-primary"
               style={{ width: `${Math.min(user.percentage, 100)}%` }}
             />
           </div>
@@ -111,11 +123,19 @@ function UserRow({ user }: { user: MonthUserSpend }) {
           <span className="text-[11px] text-muted-foreground">
             {user.tapCount} tap{user.tapCount !== 1 ? "s" : ""}
           </span>
+          {user.lastActivityAt && (
+            <>
+              <span className="text-border">·</span>
+              <span className="text-[11px] text-muted-foreground">
+                {formatRelativeTime(user.lastActivityAt)}
+              </span>
+            </>
+          )}
         </div>
       </div>
       <p className="text-sm font-semibold tnum text-foreground">
-        {formatCurrency(user.totalMonth)}
+        {formatCurrency(user.totalSpend)}
       </p>
-    </div>
+    </Link>
   );
 }

@@ -1,12 +1,12 @@
 import {
-  getAdminDashboard,
+  getSpendingsPageData,
   parseDashboardPeriod,
 } from "@/lib/services/admin";
-import { DashboardScreen } from "@/components/admin/dashboard-screen";
+import { SpendingsScreen } from "@/components/admin/spendings-screen";
 
-export const metadata = { title: "Dashboard — TapShop Admin" };
+export const metadata = { title: "Spendings — TapShop Admin" };
 
-export default async function DashboardPage({
+export default async function SpendingsPage({
   searchParams,
 }: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
@@ -16,16 +16,14 @@ export default async function DashboardPage({
     period: params.period,
     date: params.date,
   });
-  const { period, summary, daily, spenders, hasMoreSpenders } =
-    await getAdminDashboard(periodInput);
+  const { period, summary, spenders } =
+    await getSpendingsPageData(periodInput);
 
   return (
-    <DashboardScreen
+    <SpendingsScreen
       period={period}
       summary={summary}
-      daily={daily}
       spenders={spenders}
-      hasMoreSpenders={hasMoreSpenders}
     />
   );
 }

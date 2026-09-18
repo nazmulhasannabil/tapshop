@@ -28,7 +28,7 @@ import { cn } from "@/lib/utils";
 
 const TABS: { id: FriendsListKind; label: string }[] = [
   { id: "friends", label: "All friends" },
-  { id: "requests", label: "Requests / Invite" },
+  { id: "requests", label: "Requests" },
   { id: "suggestions", label: "People you may know" },
 ];
 

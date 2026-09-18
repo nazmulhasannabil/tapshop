@@ -31,9 +31,7 @@ import {
   items,
   users,
 } from "./schema";
-
-/** Fixed id for the system user that owns seeded items. */
-const SYSTEM_USER_ID = "00000000-0000-4000-8000-000000000000";
+import { SYSTEM_USER_ID } from "./system";
 
 const SEED_ITEMS = [
   { name: "Tea", price: "10", icon: "☕", categoryId: DEFAULT_CATEGORY_IDS.hangout },

@@ -1,9 +1,7 @@
-import { getTodayBreakdown } from "@/lib/services/admin";
-import { TodayBreakdownScreen } from "@/components/admin/today-breakdown-screen";
+import { redirect } from "next/navigation";
 
 export const metadata = { title: "Today's Spend — TapShop Admin" };
 
-export default async function TodaySpendPage() {
-  const { total, users } = await getTodayBreakdown();
-  return <TodayBreakdownScreen total={total} users={users} />;
+export default function TodaySpendPage() {
+  redirect("/dashboard/spendings?period=today");
 }

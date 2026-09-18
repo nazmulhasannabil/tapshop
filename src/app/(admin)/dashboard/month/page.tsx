@@ -1,9 +1,7 @@
-import { getMonthBreakdown } from "@/lib/services/admin";
-import { MonthBreakdownScreen } from "@/components/admin/month-breakdown-screen";
+import { redirect } from "next/navigation";
 
 export const metadata = { title: "Month Revenue — TapShop Admin" };
 
-export default async function MonthRevenuePage() {
-  const { total, users } = await getMonthBreakdown();
-  return <MonthBreakdownScreen total={total} users={users} />;
+export default function MonthSpendPage() {
+  redirect("/dashboard/spendings?period=month");
 }
